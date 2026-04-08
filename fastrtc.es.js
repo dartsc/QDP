@@ -322,7 +322,7 @@ class _ {
           this._myWriteRow = s;
         }
       } else
-        await this._ensureToken(), await this._ensureSheet(), await this._registerColumn();
+        await this._ensureToken(), await this._ensureSheet(), await this._registerColumn(), this._myWriteRow = 2;
       this.connected = !0, this.onOpen && this.onOpen(0), this._startPolling();
     } catch (e) {
       console.error("[DriveSignal] connect failed:", e), this.onClose && this.onClose(0);
@@ -561,13 +561,15 @@ class _ {
   }
   async _appendToColumn(e, s) {
     if (this._authMode === "raw") {
-      const n = _._colIndex(e), i = this._myWriteRow;
-      return this._myWriteRow++, this._rawWriteCell(i, n, s);
+      const i = _._colIndex(e), r = this._myWriteRow;
+      return this._myWriteRow++, this._rawWriteCell(r, i, s);
     }
-    const t = `${this.sheetName}!${e}:${e}`;
+    const t = this._myWriteRow;
+    this._myWriteRow++;
+    const n = `${this.sheetName}!${e}${t}`;
     await this._sheetsRequest(
-      `/${this.spreadsheetId}/values/${encodeURIComponent(t)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-      "POST",
+      `/${this.spreadsheetId}/values/${encodeURIComponent(n)}?valueInputOption=RAW`,
+      "PUT",
       { values: [[s]] }
     );
   }
@@ -1039,7 +1041,7 @@ function Y(a) {
     payload: a.byteLength > C ? new Uint8Array(a, C) : null
   };
 }
-function O(a, e, s = H) {
+function U(a, e, s = H) {
   const t = new Uint8Array(a), n = Math.ceil(t.byteLength / s), i = [];
   for (let r = 0; r < n; r++) {
     const h = r * s, o = Math.min(h + s, t.byteLength), c = t.slice(h, o);
@@ -1082,7 +1084,7 @@ function Z(a) {
 function ee(a) {
   return new DataView(a.buffer, a.byteOffset, a.byteLength).getFloat64(0, !0);
 }
-const U = 1, v = 2, te = new TextEncoder(), se = new TextDecoder();
+const O = 1, v = 2, te = new TextEncoder(), se = new TextDecoder();
 class ne {
   /**
    * @param {function} sendFn — async (data: ArrayBuffer) => void
@@ -1115,7 +1117,7 @@ class ne {
    */
   async send(e) {
     const s = te.encode(e), t = new ArrayBuffer(1 + s.length);
-    new Uint8Array(t)[0] = U, new Uint8Array(t, 1).set(s), await this._send(t);
+    new Uint8Array(t)[0] = O, new Uint8Array(t, 1).set(s), await this._send(t);
   }
   /**
    * Send binary data.
@@ -1131,7 +1133,7 @@ class ne {
    */
   handleIncoming(e) {
     const s = new Uint8Array(e), t = s[0];
-    if (t === U) {
+    if (t === O) {
       const n = se.decode(s.slice(1));
       this._emit("text", n);
     } else t === v && this._emit("binary", e.slice(1));
@@ -1166,7 +1168,7 @@ function R(a, e) {
   const s = k.encode(e), t = new ArrayBuffer(5 + s.length), n = new DataView(t);
   return new Uint8Array(t).set(s, 5), n.setUint8(0, f.ERROR), n.setUint32(1, a, !0), t;
 }
-function F(a) {
+function W(a) {
   const e = new DataView(a), s = new Uint8Array(a), t = e.getUint8(0), n = e.getUint32(1, !0);
   switch (t) {
     case f.REQUEST: {
@@ -1249,7 +1251,7 @@ class ce {
    * @param {ArrayBuffer} buffer
    */
   handleIncoming(e) {
-    const s = F(e), t = this._pending.get(s.requestId);
+    const s = W(e), t = this._pending.get(s.requestId);
     if (t)
       switch (s.type) {
         case f.RESPONSE:
@@ -1318,7 +1320,7 @@ class de {
    * @param {ArrayBuffer} buffer
    */
   async handleIncoming(e) {
-    const s = F(e);
+    const s = W(e);
     if (s.type !== f.REQUEST) return;
     if (!this._active) {
       await this._send(R(s.requestId, "Proxy server not active"));
@@ -1461,7 +1463,7 @@ class ue {
     this._renegotiate();
   }
 }
-const B = 1, W = 2, j = 3, T = new TextEncoder(), A = new TextDecoder();
+const B = 1, F = 2, j = 3, T = new TextEncoder(), A = new TextDecoder();
 class _e {
   /**
    * @param {function} sendFn — async (data: ArrayBuffer) => void
@@ -1515,7 +1517,7 @@ class _e {
       this._streams.set(i, r), this._emit("incoming", r);
       return;
     }
-    if (t === W) {
+    if (t === F) {
       const n = s[1], i = A.decode(s.slice(2, 2 + n)), r = e.slice(2 + n), h = this._streams.get(i);
       h && h._handleData(r);
       return;
@@ -1551,7 +1553,7 @@ class D {
   async write(e) {
     if (this._closed) throw new Error("Stream closed");
     const s = new Uint8Array(e), t = T.encode(this.name), n = new ArrayBuffer(2 + t.length + s.length), i = new Uint8Array(n);
-    i[0] = W, i[1] = t.length, i.set(t, 2), i.set(s, 2 + t.length), await this._send(n);
+    i[0] = F, i[1] = t.length, i.set(t, 2), i.set(s, 2 + t.length), await this._send(n);
   }
   /**
    * Close the stream.
@@ -1695,7 +1697,7 @@ class pe {
   // ── Data transfer (file) ──
   async send(e) {
     if (!this.bonding) throw new Error("Not connected");
-    const s = N++, n = O(e, s, this.chunkSize).map((i) => g(m.CHUNK, i));
+    const s = N++, n = U(e, s, this.chunkSize).map((i) => g(m.CHUNK, i));
     await this.bonding.sendChunks(n);
   }
   async sendFile(e) {
@@ -1707,7 +1709,7 @@ class pe {
       } catch {
       }
     await new Promise((o) => setTimeout(o, 50));
-    const r = O(t, s, this.chunkSize), h = r.map((o) => g(m.CHUNK, o));
+    const r = U(t, s, this.chunkSize), h = r.map((o) => g(m.CHUNK, o));
     this._emit("send-start", { transferId: s, name: e.name, totalChunks: r.length }), await this.bonding.sendChunks(h), this._emit("send-complete", { transferId: s, name: e.name });
   }
   getStats() {
@@ -1957,10 +1959,10 @@ export {
   Y as decodeChunk,
   X as decodeMetaPayload,
   ee as decodeProbeTimestamp,
-  F as decodeProxyFrame,
+  W as decodeProxyFrame,
   E as encodeChunk,
   Q as encodeMetaChunk,
   Z as encodeProbe,
   ie as encodeRequest,
-  O as splitIntoChunks
+  U as splitIntoChunks
 };
