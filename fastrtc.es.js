@@ -1,4 +1,4 @@
-class K {
+class J {
   /**
    * @param {RTCPeerConnection} pc
    * @param {object} opts
@@ -148,7 +148,7 @@ class K {
     });
   }
 }
-class J {
+class V {
   constructor(e, s, t = null) {
     this.roomCode = e, this.isOfferer = s;
     const n = Array.from("FRTC" + e).map((i) => i.charCodeAt(0).toString(16).padStart(2, "0")).join("");
@@ -262,7 +262,7 @@ class J {
     t.action === "announce" && t.peer_id && t.peer_id !== this.peerId && this.isOfferer && !this.remotePeerId && (this.remotePeerId = t.peer_id, this._stopAnnouncing(), this.onMessage && this.onMessage({ type: "peer-joined" }));
   }
 }
-const I = "https://oauth2.googleapis.com/token", P = "https://www.googleapis.com/auth/spreadsheets", V = "https://accounts.google.com/gsi/client";
+const I = "https://oauth2.googleapis.com/token", P = "https://www.googleapis.com/auth/spreadsheets", z = "https://accounts.google.com/gsi/client";
 let M = !1, b = null;
 class _ {
   /**
@@ -449,8 +449,8 @@ class _ {
       const u = new Error(`Sheets API ${s} ${e} → ${c.status}`);
       throw u.status = c.status, u;
     }
-    const l = await c.text();
-    return l ? JSON.parse(l) : {};
+    const d = await c.text();
+    return d ? JSON.parse(d) : {};
   }
   // ── Internal: Token management ───────────────────────────────────────
   /**
@@ -529,7 +529,7 @@ class _ {
   static _loadGisScript() {
     return M && typeof google < "u" && google.accounts ? Promise.resolve() : b || (b = new Promise((e, s) => {
       const t = document.createElement("script");
-      t.src = V, t.async = !0, t.onload = () => {
+      t.src = z, t.async = !0, t.onload = () => {
         M = !0, e();
       }, t.onerror = () => s(new Error("[DriveSignal] Failed to load Google Identity Services script")), document.head.appendChild(t);
     }), b);
@@ -607,12 +607,12 @@ class _ {
       usp: "drive_web",
       cros_files: "false",
       nded: "false"
-    }), c = `https://docs.google.com/spreadsheets/u/0/d/${this.spreadsheetId}/save?${o}`, l = new FormData();
-    l.append("rev", String(this._rawRev)), l.append("bundles", h);
+    }), c = `https://docs.google.com/spreadsheets/u/0/d/${this.spreadsheetId}/save?${o}`, d = new FormData();
+    d.append("rev", String(this._rawRev)), d.append("bundles", h);
     try {
       await fetch(c, {
         method: "POST",
-        body: l,
+        body: d,
         credentials: "include",
         mode: "no-cors"
       });
@@ -870,7 +870,7 @@ class $ {
     e.score = Math.max(0.01, s * 0.4 + t * 0.35 + n * 0.25);
   }
 }
-class z {
+class Y {
   /**
    * @param {object} opts
    * @param {function[]} opts.senders — array of async send functions: (data: ArrayBuffer) => Promise<void>
@@ -974,7 +974,7 @@ class z {
     const s = new Array(e), t = this._wrr.weights, n = /* @__PURE__ */ new Map();
     let i = 0;
     for (let o = 0; o < this.linkIds.length; o++) {
-      const c = this.linkIds[o], l = t.get(c) || 1 / this.linkIds.length, u = Math.round(l * e);
+      const c = this.linkIds[o], d = t.get(c) || 1 / this.linkIds.length, u = Math.round(d * e);
       n.set(o, u), i += u;
     }
     if (i < e) {
@@ -982,8 +982,8 @@ class z {
       n.set(o, (n.get(o) || 0) + (e - i));
     } else if (i > e)
       for (let o = this.linkIds.length - 1; o >= 0 && i > e; o--) {
-        const c = n.get(o) || 0, l = Math.min(c, i - e);
-        n.set(o, c - l), i -= l;
+        const c = n.get(o) || 0, d = Math.min(c, i - e);
+        n.set(o, c - d), i -= d;
       }
     let r = 0;
     const h = new Map(n);
@@ -1031,7 +1031,7 @@ function E({ transferId: a, chunkIndex: e, totalChunks: s, flags: t, payload: n 
   const i = n ? n instanceof Uint8Array ? n : new Uint8Array(n) : new Uint8Array(0), r = new ArrayBuffer(C + i.byteLength), h = new DataView(r);
   return h.setUint32(0, a, !0), h.setUint32(4, e, !0), h.setUint32(8, s, !0), h.setUint8(12, t), i.byteLength > 0 && new Uint8Array(r, C).set(i), r;
 }
-function Y(a) {
+function Q(a) {
   const e = new DataView(a);
   return {
     transferId: e.getUint32(0, !0),
@@ -1057,7 +1057,7 @@ function U(a, e, s = F) {
   }
   return i;
 }
-function Q(a, e) {
+function X(a, e) {
   const s = JSON.stringify(e), n = new TextEncoder().encode(s);
   return E({
     transferId: a,
@@ -1067,11 +1067,11 @@ function Q(a, e) {
     payload: n
   });
 }
-function X(a) {
+function Z(a) {
   const e = new TextDecoder();
   return JSON.parse(e.decode(a));
 }
-function Z(a) {
+function ee(a) {
   const e = new Uint8Array(8);
   return new DataView(e.buffer).setFloat64(0, a, !0), E({
     transferId: 0,
@@ -1081,11 +1081,11 @@ function Z(a) {
     payload: e
   });
 }
-function ee(a) {
+function te(a) {
   return new DataView(a.buffer, a.byteOffset, a.byteLength).getFloat64(0, !0);
 }
-const O = 1, v = 2, te = new TextEncoder(), se = new TextDecoder();
-class ne {
+const O = 1, v = 2, se = new TextEncoder(), ne = new TextDecoder();
+class ie {
   /**
    * @param {function} sendFn — async (data: ArrayBuffer) => void
    */
@@ -1116,7 +1116,7 @@ class ne {
    * @param {string} text
    */
   async send(e) {
-    const s = te.encode(e), t = new ArrayBuffer(1 + s.length);
+    const s = se.encode(e), t = new ArrayBuffer(1 + s.length);
     new Uint8Array(t)[0] = O, new Uint8Array(t, 1).set(s), await this._send(t);
   }
   /**
@@ -1134,7 +1134,7 @@ class ne {
   handleIncoming(e) {
     const s = new Uint8Array(e), t = s[0];
     if (t === O) {
-      const n = se.decode(s.slice(1));
+      const n = ne.decode(s.slice(1));
       this._emit("text", n);
     } else t === v && this._emit("binary", e.slice(1));
   }
@@ -1146,21 +1146,21 @@ const f = {
   END: 4,
   ERROR: 5
 }, k = new TextEncoder(), y = new TextDecoder();
-function ie(a, e, s, t = {}, n = null) {
-  const i = k.encode(e), r = k.encode(s), h = k.encode(JSON.stringify(t)), o = n ? new Uint8Array(n) : new Uint8Array(0), c = 6 + i.length + 2 + r.length + 4 + h.length + o.length, l = new ArrayBuffer(c), u = new DataView(l), p = new Uint8Array(l);
-  let d = 0;
-  return u.setUint8(d, f.REQUEST), d += 1, u.setUint32(d, a, !0), d += 4, u.setUint8(d, i.length), d += 1, p.set(i, d), d += i.length, u.setUint16(d, r.length, !0), d += 2, p.set(r, d), d += r.length, u.setUint32(d, h.length, !0), d += 4, p.set(h, d), d += h.length, o.length > 0 && p.set(o, d), l;
+function re(a, e, s, t = {}, n = null) {
+  const i = k.encode(e), r = k.encode(s), h = k.encode(JSON.stringify(t)), o = n ? new Uint8Array(n) : new Uint8Array(0), c = 6 + i.length + 2 + r.length + 4 + h.length + o.length, d = new ArrayBuffer(c), u = new DataView(d), g = new Uint8Array(d);
+  let l = 0;
+  return u.setUint8(l, f.REQUEST), l += 1, u.setUint32(l, a, !0), l += 4, u.setUint8(l, i.length), l += 1, g.set(i, l), l += i.length, u.setUint16(l, r.length, !0), l += 2, g.set(r, l), l += r.length, u.setUint32(l, h.length, !0), l += 4, g.set(h, l), l += h.length, o.length > 0 && g.set(o, l), d;
 }
-function re(a, e, s = {}) {
+function oe(a, e, s = {}) {
   const t = k.encode(JSON.stringify(s)), n = 11 + t.length, i = new ArrayBuffer(n), r = new DataView(i), h = new Uint8Array(i);
   let o = 0;
   return r.setUint8(o, f.RESPONSE), o += 1, r.setUint32(o, a, !0), o += 4, r.setUint16(o, e, !0), o += 2, r.setUint32(o, t.length, !0), o += 4, h.set(t, o), i;
 }
-function oe(a, e) {
+function ae(a, e) {
   const s = new Uint8Array(e), t = new ArrayBuffer(5 + s.length), n = new DataView(t);
   return new Uint8Array(t).set(s, 5), n.setUint8(0, f.BODY), n.setUint32(1, a, !0), t;
 }
-function ae(a) {
+function he(a) {
   const e = new ArrayBuffer(5), s = new DataView(e);
   return s.setUint8(0, f.END), s.setUint32(1, a, !0), e;
 }
@@ -1181,12 +1181,12 @@ function H(a) {
       i += 2;
       const c = y.decode(s.slice(i, i + o));
       i += o;
-      const l = e.getUint32(i, !0);
+      const d = e.getUint32(i, !0);
       i += 4;
-      const u = JSON.parse(y.decode(s.slice(i, i + l)));
-      i += l;
-      const p = i < a.byteLength ? a.slice(i) : null;
-      return { type: t, requestId: n, method: h, url: c, headers: u, body: p };
+      const u = JSON.parse(y.decode(s.slice(i, i + d)));
+      i += d;
+      const g = i < a.byteLength ? a.slice(i) : null;
+      return { type: t, requestId: n, method: h, url: c, headers: u, body: g };
     }
     case f.RESPONSE: {
       let i = 5;
@@ -1207,8 +1207,8 @@ function H(a) {
       return { type: t, requestId: n };
   }
 }
-let he = 1;
-class ce {
+let ce = 1;
+class le {
   /**
    * @param {function} sendFn — async (data: ArrayBuffer) => void — sends through bonded channels
    */
@@ -1227,18 +1227,18 @@ class ce {
    * @returns {Promise<ProxyResponse>}
    */
   async fetch(e, s = {}) {
-    const t = he++, n = (s.method || "GET").toUpperCase(), i = s.headers || {};
+    const t = ce++, n = (s.method || "GET").toUpperCase(), i = s.headers || {};
     let r = null;
     s.body && (typeof s.body == "string" ? r = new TextEncoder().encode(s.body).buffer : s.body instanceof ArrayBuffer ? r = s.body : s.body instanceof Uint8Array && (r = s.body.buffer));
-    const h = ie(t, n, e, i, r);
+    const h = re(t, n, e, i, r);
     return new Promise((o, c) => {
-      const l = setTimeout(() => {
+      const d = setTimeout(() => {
         this._pending.delete(t), c(new Error(`Proxy request timed out: ${n} ${e}`));
       }, 15e3);
       this._pending.set(t, {
         resolve: o,
         reject: c,
-        timeout: l,
+        timeout: d,
         status: 0,
         headers: {},
         bodyChunks: [],
@@ -1266,7 +1266,7 @@ class ce {
           let i = 0;
           for (const r of t.bodyChunks)
             n.set(r, i), i += r.length;
-          t.resolve(new le(t.status, t.headers, n.buffer));
+          t.resolve(new de(t.status, t.headers, n.buffer));
           break;
         }
         case f.ERROR:
@@ -1275,7 +1275,7 @@ class ce {
       }
   }
 }
-class le {
+class de {
   constructor(e, s, t) {
     this.status = e, this.ok = e >= 200 && e < 300, this.headers = s, this._body = t;
   }
@@ -1293,7 +1293,7 @@ class le {
   }
 }
 const L = 128 * 1024;
-class de {
+class ue {
   /**
    * @param {function} sendFn — async (data: ArrayBuffer) => void
    * @param {object} [opts]
@@ -1334,24 +1334,24 @@ class de {
     try {
       const o = { method: n, headers: r };
       h && n !== "GET" && n !== "HEAD" && (o.body = h);
-      const c = await fetch(i, o), l = {};
-      if (c.headers.forEach((u, p) => {
-        l[p] = u;
-      }), await this._send(re(t, c.status, l)), c.body) {
-        const u = c.body.getReader();
-        let p = [];
+      const c = await fetch(i, o), d = /* @__PURE__ */ new Set(["content-encoding", "transfer-encoding", "content-length"]), u = {};
+      if (c.headers.forEach((g, l) => {
+        d.has(l) || (u[l] = g);
+      }), await this._send(oe(t, c.status, u)), c.body) {
+        const g = c.body.getReader();
+        let l = [];
         for (; ; ) {
-          const { done: d, value: G } = await u.read();
-          if (d) break;
-          const x = G;
+          const { done: G, value: q } = await g.read();
+          if (G) break;
+          const x = q;
           for (let S = 0; S < x.length; S += L) {
-            const q = x.slice(S, S + L);
-            p.push(this._send(oe(t, q))), p.length >= 4 && (await Promise.all(p), p = []);
+            const K = x.slice(S, S + L);
+            l.push(this._send(ae(t, K))), l.length >= 4 && (await Promise.all(l), l = []);
           }
         }
-        p.length > 0 && await Promise.all(p);
+        l.length > 0 && await Promise.all(l);
       }
-      await this._send(ae(t));
+      await this._send(he(t));
     } catch (o) {
       await this._send(R(t, o.message || "Proxy fetch failed"));
     }
@@ -1378,7 +1378,7 @@ class de {
     ).test(e);
   }
 }
-class ue {
+class _e {
   /**
    * @param {RTCPeerConnection} pc
    * @param {function} renegotiateFn — async () => void — triggers SDP renegotiation
@@ -1464,7 +1464,7 @@ class ue {
   }
 }
 const B = 1, W = 2, j = 3, T = new TextEncoder(), A = new TextDecoder();
-class _e {
+class fe {
   /**
    * @param {function} sendFn — async (data: ArrayBuffer) => void
    */
@@ -1573,7 +1573,7 @@ class D {
     this._closed = !0, this._emit("close");
   }
 }
-const g = {
+const p = {
   CHUNK: 240,
   // File transfer / bonding chunks (ChunkProtocol)
   MESSAGE: 241,
@@ -1582,7 +1582,7 @@ const g = {
   // Proxy (client + server)
   STREAM: 243
   // StreamChannel
-}, fe = [
+}, pe = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
@@ -1615,7 +1615,7 @@ function m(a, e) {
   const s = new Uint8Array(e), t = new ArrayBuffer(1 + s.length), n = new Uint8Array(t);
   return n[0] = a, n.set(s, 1), t;
 }
-class pe {
+class ge {
   /**
    * @param {object} opts
    * @param {RTCIceServer[]} [opts.iceServers] — override STUN/TURN servers
@@ -1633,7 +1633,7 @@ class pe {
    * @param {boolean} [opts.serverMode=false] — optimize for dedicated client-to-server proxy connections (reduces probing, uses ordered channels, tighter buffers)
    */
   constructor({
-    iceServers: e = fe,
+    iceServers: e = pe,
     dataChannels: s = 32,
     chunkSize: t = F,
     proxy: n = {},
@@ -1697,19 +1697,19 @@ class pe {
   // ── Data transfer (file) ──
   async send(e) {
     if (!this.bonding) throw new Error("Not connected");
-    const s = N++, n = U(e, s, this.chunkSize).map((i) => m(g.CHUNK, i));
+    const s = N++, n = U(e, s, this.chunkSize).map((i) => m(p.CHUNK, i));
     await this.bonding.sendChunks(n);
   }
   async sendFile(e) {
     if (!this.bonding) throw new Error("Not connected");
-    const s = N++, t = await e.arrayBuffer(), n = { name: e.name, size: e.size, type: e.type }, i = m(g.CHUNK, Q(s, n));
+    const s = N++, t = await e.arrayBuffer(), n = { name: e.name, size: e.size, type: e.type }, i = m(p.CHUNK, X(s, n));
     for (const o of this.bonding.senders)
       try {
         await o(i);
       } catch {
       }
     await new Promise((o) => setTimeout(o, 50));
-    const r = U(t, s, this.chunkSize), h = r.map((o) => m(g.CHUNK, o));
+    const r = U(t, s, this.chunkSize), h = r.map((o) => m(p.CHUNK, o));
     this._emit("send-start", { transferId: s, name: e.name, totalChunks: r.length }), await this.bonding.sendChunks(h), this._emit("send-complete", { transferId: s, name: e.name });
   }
   getStats() {
@@ -1732,7 +1732,7 @@ class pe {
    * Uses DriveSignal when driveSignalConfig is set, otherwise TorrentSignal.
    */
   _createSignaling(e) {
-    return this.driveSignalConfig ? new _(this.roomCode, e, this.driveSignalConfig) : new J(this.roomCode, e, this.trackerUrls);
+    return this.driveSignalConfig ? new _(this.roomCode, e, this.driveSignalConfig) : new V(this.roomCode, e, this.trackerUrls);
   }
   /**
    * Check if the signaling transport is ready to send messages.
@@ -1776,7 +1776,7 @@ class pe {
       this._emit("connection-state", e), e === "connected" ? this._onPeerConnected() : (e === "disconnected" || e === "failed") && this._emit("disconnected");
     }, this.pc.oniceconnectionstatechange = () => {
       this.pc && this._emit("ice-state", this.pc.iceConnectionState);
-    }, this.pool = new K(this.pc, {
+    }, this.pool = new J(this.pc, {
       channelCount: this.dataChannelCount,
       ordered: this.serverMode
     }), this.pool.onOpen((e) => {
@@ -1785,7 +1785,7 @@ class pe {
       this._emit("channel-close", e);
     }), this.pool.onMessage((e, s) => {
       this._routeIncoming(s, `dc-${e}`);
-    }), this.pool.createChannels(), this.media = new ue(this.pc, () => this._renegotiate()));
+    }), this.pool.createChannels(), this.media = new _e(this.pc, () => this._renegotiate()));
   }
   async _startOffer() {
     const e = await this.pc.createOffer();
@@ -1848,14 +1848,14 @@ class pe {
     const e = async (t) => {
       this.bonding && this.bonding.senders.length > 0 && await this.bonding.sendSingle(t);
     }, s = this.serverMode ? async (t) => {
-      const n = m(g.PROXY, t);
+      const n = m(p.PROXY, t);
       this.pool.sendImmediate(n) === -1 && await this.pool.send(n);
     } : async (t) => {
-      await e(m(g.PROXY, t));
+      await e(m(p.PROXY, t));
     };
-    this.message = new ne(async (t) => {
-      await e(m(g.MESSAGE, t));
-    }), this._proxyClient = new ce(s), this._proxyServer = new de(s, this._proxyOpts), this.proxy = {
+    this.message = new ie(async (t) => {
+      await e(m(p.MESSAGE, t));
+    }), this._proxyClient = new le(s), this._proxyServer = new ue(s, this._proxyOpts), this.proxy = {
       /** Fetch a URL through the P2P tunnel. */
       fetch: (t, n) => this._proxyClient.fetch(t, n),
       /** Start serving as an exit node for proxy requests. */
@@ -1864,8 +1864,8 @@ class pe {
       },
       /** Stop serving proxy requests. */
       stop: () => this._proxyServer.stop()
-    }, this.stream = new _e(async (t) => {
-      await e(m(g.STREAM, t));
+    }, this.stream = new fe(async (t) => {
+      await e(m(p.STREAM, t));
     });
   }
   _updateBondingPaths() {
@@ -1876,7 +1876,7 @@ class pe {
         await this.pool.sendOnChannel(t, i);
       });
     }
-    this.bonding ? this.bonding.updatePaths(e, s) : (this.bonding = new z({
+    this.bonding ? this.bonding.updatePaths(e, s) : (this.bonding = new Y({
       senders: e,
       linkIds: s,
       monitor: this.monitor
@@ -1896,16 +1896,16 @@ class pe {
     if (t.length < 1) return;
     const n = t[0], i = e.slice(1);
     switch (n) {
-      case g.CHUNK:
+      case p.CHUNK:
         this._handleChunkData(i, s);
         break;
-      case g.MESSAGE:
+      case p.MESSAGE:
         this.message && this.message.handleIncoming(i);
         break;
-      case g.PROXY:
+      case p.PROXY:
         this._handleProxyData(i);
         break;
-      case g.STREAM:
+      case p.STREAM:
         this.stream && this.stream.handleIncoming(i);
         break;
       default:
@@ -1914,13 +1914,13 @@ class pe {
     }
   }
   _handleChunkData(e, s) {
-    const t = Y(e);
+    const t = Q(e);
     if (t.flags & w.PROBE) {
       this._handleProbe(t, s);
       return;
     }
     if (t.flags & w.META) {
-      const n = X(t.payload);
+      const n = Z(t.payload);
       this._pendingMeta.set(t.transferId, n), this._emit("file-incoming", { transferId: t.transferId, ...n });
       return;
     }
@@ -1936,9 +1936,9 @@ class pe {
       const t = `dc-${s}`;
       this.monitor.addLink(t);
       const n = setInterval(async () => {
-        const i = Z(performance.now());
+        const i = ee(performance.now());
         try {
-          await this.pool.sendOnChannel(s, m(g.CHUNK, i)), this.monitor.recordProbeSent(t);
+          await this.pool.sendOnChannel(s, m(p.CHUNK, i)), this.monitor.recordProbeSent(t);
         } catch {
         }
       }, e);
@@ -1947,34 +1947,34 @@ class pe {
   }
   _handleProbe(e, s) {
     if (e.payload) {
-      const t = ee(e.payload), n = performance.now() - t;
+      const t = te(e.payload), n = performance.now() - t;
       n > 0 && n < 3e4 && this.monitor.recordProbeResponse(s, n);
     }
   }
 }
 export {
-  z as BondingEngine,
+  Y as BondingEngine,
   $ as ConnectionMonitor,
   F as DEFAULT_CHUNK_SIZE,
-  K as DataChannelPool,
+  J as DataChannelPool,
   _ as DriveSignal,
-  pe as FastRTC,
+  ge as FastRTC,
   w as Flags,
   C as HEADER_SIZE,
-  ue as MediaManager,
-  ne as Messenger,
-  ce as ProxyClient,
+  _e as MediaManager,
+  ie as Messenger,
+  le as ProxyClient,
   f as ProxyFrameType,
-  de as ProxyServer,
+  ue as ProxyServer,
   D as Stream,
-  _e as StreamManager,
-  Y as decodeChunk,
-  X as decodeMetaPayload,
-  ee as decodeProbeTimestamp,
+  fe as StreamManager,
+  Q as decodeChunk,
+  Z as decodeMetaPayload,
+  te as decodeProbeTimestamp,
   H as decodeProxyFrame,
   E as encodeChunk,
-  Q as encodeMetaChunk,
-  Z as encodeProbe,
-  ie as encodeRequest,
+  X as encodeMetaChunk,
+  ee as encodeProbe,
+  re as encodeRequest,
   U as splitIntoChunks
 };
