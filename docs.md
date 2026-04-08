@@ -1,4 +1,4 @@
-# SpeedRTC v2.5 The Serverless P2P Suite
+# SpeedRTC v2.5 — The Serverless P2P Suite
 
 SpeedRTC is a comprehensive **P2P Communication Suite** built on WebRTC data channel bonding. It is fully serverless, using public WebTorrent trackers for peer matchmaking.
 
@@ -162,7 +162,7 @@ rtc.proxy.serve({
 
 #### Chunk Size
 
-Response bodies are split into chunks before being sent over WebRTC data channels. The default chunk size is **16KB**, which is safe for all WebRTC implementations including `node-datachannel` ? browser SCTP.
+Response bodies are split into chunks before being sent over WebRTC data channels. The default chunk size is **16KB**, which is safe for all WebRTC implementations including `node-datachannel` ↔ browser SCTP.
 
 If you're running browser-to-browser (both using native WebRTC), you can increase this for better throughput:
 
@@ -192,10 +192,10 @@ Every body chunk carries a sequence number. The client sorts chunks by sequence 
 
 The proxy server automatically strips hop-by-hop and encoding headers from responses:
 
-- `content-encoding` � Node's fetch() auto-decompresses gzip/br/deflate but preserves the original header; forwarding it would cause double-decompression
-- `transfer-encoding` � chunked encoding is handled by the proxy framing layer
-- `content-length` � the compressed content-length doesn't match the decompressed body size
-- `connection`, `keep-alive`, `upgrade`, `proxy-authenticate`, `proxy-authorization`, `te`, `trailer` � standard hop-by-hop headers per RFC 2616
+- `content-encoding` — Node's fetch() auto-decompresses gzip/br/deflate but preserves the original header; forwarding it would cause double-decompression
+- `transfer-encoding` — chunked encoding is handled by the proxy framing layer
+- `content-length` — the compressed content-length doesn't match the decompressed body size
+- `connection`, `keep-alive`, `upgrade`, `proxy-authenticate`, `proxy-authorization`, `te`, `trailer` — standard hop-by-hop headers per RFC 2616
 
 
 ### Running a Dedicated Proxy Host (Node.js)
@@ -212,7 +212,7 @@ By deploying a simple Node.js script to a cheap VPS (using a library like `node-
 
 ### Server Mode (Optimized Proxy Connections)
 
-When connecting to a **dedicated server** (e.g. a VPS exit node), enable `serverMode` to unlock a fully optimized proxy pipeline. This mode tunes every layer of SpeedRTC for maximum client?server throughput and minimum latency.
+When connecting to a **dedicated server** (e.g. a VPS exit node), enable `serverMode` to unlock a fully optimized proxy pipeline. This mode tunes every layer of SpeedRTC for maximum client↔server throughput and minimum latency.
 
 ```javascript
 const rtc = new SpeedRTC({
@@ -232,7 +232,7 @@ server.proxy.serve();
 | Layer | Default | Server Mode |
 |---|---|---|
 | Data channels | Unordered (for P2P) | **Ordered** (eliminates reordering overhead on stable links) |
-| Proxy send path | Routes through bonding engine | **Direct pool send** � bypasses bonding entirely, uses synchronous fast-path |
+| Proxy send path | Routes through bonding engine | **Direct pool send** — bypasses bonding entirely, uses synchronous fast-path |
 | Buffer high watermark | 1 MB | **512 KB** (tighter backpressure = faster push-through) |
 | Buffer low watermark | 256 KB | **128 KB** (resume sooner) |
 | Probe interval | 3 seconds | **8 seconds** (stable connections don't need frequent probes) |
@@ -324,17 +324,17 @@ rtc.disconnect();
 
 SpeedRTC can use a **Google Spreadsheet** as the signaling channel instead of WebTorrent trackers. Each peer gets a unique 9-character alphanumeric column header (e.g. `439ARWI38`), and signaling messages (SDP offers, answers, ICE candidates) are written as rows under that column. The remote peer polls the sheet to read them.
 
-This lets you integrate your own Google Drive credentials and use a shared spreadsheet as the signaling relay � no WebSocket servers or public trackers needed.
+This lets you integrate your own Google Drive credentials and use a shared spreadsheet as the signaling relay — no WebSocket servers or public trackers needed.
 
 > **Alpha**: Client-side reads and writes via Google Sheets API v4.
-> **Beta** (planned): Server-sent writes � the server POSTs signaling data to the sheet; clients only need read access.
+> **Beta** (planned): Server-sent writes — the server POSTs signaling data to the sheet; clients only need read access.
 
 ### Spreadsheet Layout
 
 | 439ARWI38 | 7BX2KM91P |
 |---|---|
-| `{"type":"offer","sdp":{�}}` | `{"type":"answer","sdp":{�}}` |
-| `{"type":"ice-candidate","candidate":{�}}` | `{"type":"ice-candidate","candidate":{�}}` |
+| `{"type":"offer","sdp":{…}}` | `{"type":"answer","sdp":{…}}` |
+| `{"type":"ice-candidate","candidate":{…}}` | `{"type":"ice-candidate","candidate":{…}}` |
 
 Row 1 = peer ID headers. Row 2+ = JSON signaling messages from that peer.
 
@@ -343,7 +343,7 @@ Row 1 = peer ID headers. Row 2+ = JSON signaling messages from that peer.
 1. Create a Google Spreadsheet and note its **Spreadsheet ID** (the long string in the URL between `/d/` and `/edit`).
 2. Pick an auth mode (see below) and pass it alongside the spreadsheet ID.
 
-#### Auth Mode 1: Raw Request (Zero Auth � client only, works from plain HTML)
+#### Auth Mode 1: Raw Request (Zero Auth — client only, works from plain HTML)
 
 Uses the browser's existing Google login cookies to write directly to the spreadsheet via Google's internal save endpoint, and reads via the public JSONP endpoint.
 
@@ -354,7 +354,7 @@ Uses the browser's existing Google login cookies to write directly to the spread
 
 **How to get the token:**
 1. Open your spreadsheet in Chrome
-2. Open DevTools ? Network tab
+2. Open DevTools → Network tab
 3. Type something in any cell and press Enter
 4. In the Network tab, find the `save?id=...` request
 5. Copy the `token` query parameter value
@@ -377,15 +377,15 @@ Uses the browser's existing Google login cookies to write directly to the spread
 </script>
 ```
 
-- **Writes**: Fire-and-forget POST to the internal `docs.google.com` save endpoint with `credentials: 'include'` � the browser attaches your Google cookies automatically.
-- **Reads**: JSONP script-tag injection to the public gviz endpoint � no auth needed since the sheet is shared.
+- **Writes**: Fire-and-forget POST to the internal `docs.google.com` save endpoint with `credentials: 'include'` — the browser attaches your Google cookies automatically.
+- **Reads**: JSONP script‑tag injection to the public gviz endpoint — no auth needed since the sheet is shared.
 
-#### Auth Mode 2: Client-Only (Alpha � OAuth popup, works from plain HTML)
+#### Auth Mode 2: Client-Only (Alpha — OAuth popup, works from plain HTML)
 
 Provide a Google OAuth2 Client ID. DriveSignal loads Google Identity Services in the browser and presents a one-time consent dialog. Tokens auto-renew silently afterward. Works from a plain HTML file opened via `file://` or any static host.
 
 **GCP setup** (one-time):
-1. Go to [Google Cloud Console ? Credentials](https://console.cloud.google.com/apis/credentials)
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
 2. Create an **OAuth 2.0 Client ID** of type **Web application**
 3. Under "Authorized JavaScript origins", add your origin (or leave blank for `file://`)
 4. Copy the Client ID
@@ -405,7 +405,7 @@ Provide a Google OAuth2 Client ID. DriveSignal loads Google Identity Services in
 </script>
 ```
 
-#### Auth Mode 3: Service Account (Recommended for automation � never expires)
+#### Auth Mode 3: Service Account (Recommended for automation — never expires)
 
 Create a GCP service account, download the JSON key, and share the spreadsheet with its email.
 
@@ -414,7 +414,7 @@ const rtc = new SpeedRTC({
   driveSignal: {
     spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms',
     serviceAccount: {
-      client_email: 'speedrtc@my-project.iam.gserviceaccount.com',
+      client_email: 'SpeedRTC@my-project.iam.gserviceaccount.com',
       private_key: '-----BEGIN PRIVATE KEY-----\nMIIEvg...\n-----END PRIVATE KEY-----\n',
     },
   }
@@ -439,7 +439,7 @@ const rtc = new SpeedRTC({
 });
 ```
 
-#### Auth Mode 5: Direct Access Token (Temporary � ~60 min)
+#### Auth Mode 5: Direct Access Token (Temporary — ~60 min)
 
 If you already have a short-lived OAuth2 access token:
 
@@ -468,7 +468,7 @@ const rtc = new SpeedRTC({
 By default, SpeedRTC signals over WebTorrent trackers. Setting the `driveSignal` option switches the signaling channel to the configured Google Spreadsheet. Room creation, peer connection, file transfers, messaging, proxying works identically.
 
 ```javascript
-import { DriveSignal } from 'speedrtc';
+import { DriveSignal } from 'SpeedRTC';
 
 const signal = new DriveSignal('MY-ROOM', true, {
   spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms',
@@ -492,12 +492,12 @@ signal.close();
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `spreadsheetId` | string | *required* | Google Spreadsheet ID |
-| `raw` | object | � | `{ token, ouid?, gid?, rev? }` � Zero-auth raw request mode. Uses browser cookies. |
-| `clientId` | string | � | OAuth2 client ID. **Alone** = client-only browser popup auth (no server). With `clientSecret` + `refreshToken` = refresh flow. |
-| `serviceAccount` | object | � | `{ client_email, private_key }` from a GCP service account JSON key |
-| `clientSecret` | string | � | OAuth2 client secret (only needed for refresh token flow) |
-| `refreshToken` | string | � | Long-lived refresh token (requires clientId + clientSecret) |
-| `accessToken` | string | � | Direct OAuth2 access token (temporary, ~60 min) |
-| `apiKey` | string | � | API key (read-only fallback) |
+| `raw` | object | — | `{ token, ouid?, gid?, rev? }` — Zero-auth raw request mode. Uses browser cookies. |
+| `clientId` | string | — | OAuth2 client ID. **Alone** = client-only browser popup auth (no server). With `clientSecret` + `refreshToken` = refresh flow. |
+| `serviceAccount` | object | — | `{ client_email, private_key }` from a GCP service account JSON key |
+| `clientSecret` | string | — | OAuth2 client secret (only needed for refresh token flow) |
+| `refreshToken` | string | — | Long-lived refresh token (requires clientId + clientSecret) |
+| `accessToken` | string | — | Direct OAuth2 access token (temporary, ~60 min) |
+| `apiKey` | string | — | API key (read-only fallback) |
 | `pollInterval` | number | `1500` | Polling frequency in milliseconds |
 | `sheetName` | string | room code | Sheet tab name (one tab per room) |
