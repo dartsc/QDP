@@ -1,16 +1,16 @@
 # FastRTC v2.5 — The Serverless P2P Suite
 
-FastRTC has evolved from a simple file-transfer engine into a comprehensive **P2P Communication Suite**. It leverages WebRTC data channel bonding to achieve unparalleled speeds, and it's now **100% serverless** thanks to matchmaking over public WebTorrent trackers.
+FastRTC is a comprehensive **P2P Communication Suite** built on WebRTC data channel bonding. It is fully serverless, using public WebTorrent trackers for peer matchmaking.
 
 ## Core Features
 
-- **🌐 Serverless Matchmaking**: Connects instantly across networks using 22 concurrent public WebTorrent trackers. No Node.js backend required!
-- **🔗 Bonded Channels**: Stripes data across 32 parallel WebRTC data channels simultaneously for maximum throughput.
-- **📁 File Transfer**: Ultra-fast P2P file transfers with zero limits.
-- **💬 Real-time Chat**: Text and binary P2P messaging.
-- **🛡️ HTTP Proxying**: Tunnel actual HTTP `fetch()` requests through the P2P connection to bypass firewalls or region blocks.
-- **📹 Audio / Video Calls**: Add camera and screen-sharing directly to the P2P mesh.
-- **⚡ Data Streaming**: Continuous generic binary feeds with backpressure handling.
+- **Serverless Matchmaking**: Connects across networks using public WebTorrent trackers.
+- **Bonded Channels**: Stripes data across parallel WebRTC data channels for maximum throughput.
+- **File Transfer**: P2P file transfers with no size limits.
+- **Messaging**: Text and binary P2P messaging.
+- **HTTP Proxying**: Tunnel HTTP `fetch()` requests through the P2P connection to bypass firewalls or region blocks.
+- **Audio / Video Calls**: Camera and screen-sharing via the P2P connection.
+- **Data Streaming**: Continuous binary feeds with backpressure handling.
 
 ---
 
@@ -164,7 +164,58 @@ const data = await response.json();
 console.log(data);
 ```
 
-### 🖥️ Running a Dedicated Proxy Host (Node.js)
+### Proxy Options
+
+`proxy.serve()` accepts several options to tune behavior for your transport:
+
+```javascript
+rtc.proxy.serve({
+  allowList: [],        // glob patterns for allowed domains (empty = allow all)
+  blockList: [],        // glob patterns for blocked domains
+  chunkSize: 16384,     // body chunk size in bytes (default 16KB)
+  compress: false       // gzip-compress response bodies before sending
+});
+```
+
+#### Chunk Size
+
+Response bodies are split into chunks before being sent over WebRTC data channels. The default chunk size is **16KB**, which is safe for all WebRTC implementations including `node-datachannel` ↔ browser SCTP.
+
+If you're running browser-to-browser (both using native WebRTC), you can increase this for better throughput:
+
+```javascript
+rtc.proxy.serve({ chunkSize: 64 * 1024 });
+
+rtc.proxy.serve();
+
+rtc.proxy.serve({ chunkSize: 8192 });
+```
+
+#### Compression
+
+Enable gzip compression to dramatically reduce bytes transferred over SCTP. This is especially effective for HTML/CSS/JS-heavy sites:
+
+```javascript
+rtc.proxy.serve({ compress: true });
+```
+
+Compression uses the browser/Node.js `CompressionStream` API on the server side and `DecompressionStream` on the client side. Both are available in all modern browsers and Node.js 18+. If `DecompressionStream` is unavailable on the client, the raw compressed bytes are returned as-is.
+
+#### Ordered Chunk Reassembly
+
+Every body chunk carries a sequence number. The client sorts chunks by sequence number before reassembly, so responses are always correct even when chunks arrive out-of-order across multiple data channels.
+
+#### Header Stripping
+
+The proxy server automatically strips hop-by-hop and encoding headers from responses:
+
+- `content-encoding` — Node's fetch() auto-decompresses gzip/br/deflate but preserves the original header; forwarding it would cause double-decompression
+- `transfer-encoding` — chunked encoding is handled by the proxy framing layer
+- `content-length` — the compressed content-length doesn't match the decompressed body size
+- `connection`, `keep-alive`, `upgrade`, `proxy-authenticate`, `proxy-authorization`, `te`, `trailer` — standard hop-by-hop headers per RFC 2616
+
+
+### Running a Dedicated Proxy Host (Node.js)
 
 Because browser-to-browser proxying is strictly bound by standard CORS limitations, to create a **true unrestricted VPN/Proxy**, you can run FastRTC in a headless Node.js environment.
 
@@ -174,9 +225,9 @@ By deploying a simple Node.js script to a cheap VPS (using a library like `node-
 2. The Node.js Host calls `rtc.proxy.serve()`.
 3. Your browser connects to the swarm. The `connected` event fires with `info.remoteIsHost === true`.
 4. Your browser tunnels all `rtc.proxy.fetch()` traffic through the Node.js server.
-5. Because the exit node is running Node.js, **it FULLY bypasses CORS** it also cannot at all be blocked by any browser, monitoring extensions, or networks (Unless They Block a certain part of this which i will not specify here so that doesnt EVER happen) and can fetch absolutely any domain or API on the open internet and stream the raw bytes back to your browser!
+5. Because the exit node is running Node.js, it fully bypasses browser CORS restrictions and can fetch any domain or API, streaming the raw response back to the browser.
 
-### ⚡ Server Mode (Optimized Proxy Connections)
+### Server Mode (Optimized Proxy Connections)
 
 When connecting to a **dedicated server** (e.g. a VPS exit node), enable `serverMode` to unlock a fully optimized proxy pipeline. This mode tunes every layer of FastRTC for maximum client↔server throughput and minimum latency.
 
@@ -204,11 +255,12 @@ server.proxy.serve();
 | Buffer high watermark | 1 MB | **512 KB** (tighter backpressure = faster push-through) |
 | Buffer low watermark | 256 KB | **128 KB** (resume sooner) |
 | Probe interval | 3 seconds | **8 seconds** (stable connections don't need frequent probes) |
-| Body chunk size | 48 KB | **128 KB** (fewer frames per response) |
-| Response body sends | Sequential | **Pipelined** (up to 4 chunks in flight simultaneously) |
+| Body chunk size | 16 KB (configurable) | **16 KB** (safe for node-datachannel SCTP) |
+| Response body sends | Sequential with sequence numbers | **Sequential** (ensures correct ordering) |
+| Chunk reassembly | Sorted by sequence number | **Sorted by sequence number** |
 | Bonding `sendSingle()` | Recalculates weights every call | **Round-robin fast-path**, skips weight calculation for single-destination |
 | Buffer wait timeout | 5 seconds | **1.5 seconds** (fail fast on congestion) |
-| Proxy request timeout | 30 seconds | **15 seconds** |
+| Proxy request timeout | 30 seconds | **30 seconds** |
 
 These optimizations apply automatically when `serverMode: true` is set. You can combine it with all other options:
 
@@ -319,7 +371,7 @@ Row 1 = peer ID headers. Row 2+ = JSON signaling messages from that peer.
 
 #### Auth Mode 1: Raw Request (Zero Auth — client only, works from plain HTML)
 
-The absolute simplest mode. **Zero OAuth, zero API keys, zero GCP setup.** Uses the browser's existing Google login cookies to write directly to the spreadsheet via Google's internal save endpoint, and reads via the public JSONP endpoint.
+Uses the browser's existing Google login cookies to write directly to the spreadsheet via Google's internal save endpoint, and reads via the public JSONP endpoint.
 
 **Requirements:**
 - You must be logged into Google in the same browser
@@ -334,7 +386,6 @@ The absolute simplest mode. **Zero OAuth, zero API keys, zero GCP setup.** Uses 
 5. Copy the `token` query parameter value
 
 ```html
-<!-- index.html — open directly from file://, no server needed -->
 <script type="module">
   import { FastRTC } from './dist/fastrtc.es.js';
 
@@ -355,13 +406,9 @@ The absolute simplest mode. **Zero OAuth, zero API keys, zero GCP setup.** Uses 
 - **Writes**: Fire-and-forget POST to the internal `docs.google.com` save endpoint with `credentials: 'include'` — the browser attaches your Google cookies automatically.
 - **Reads**: JSONP script‑tag injection to the public gviz endpoint — no auth needed since the sheet is shared.
 
-No tokens expire, no popups, no OAuth flows. As long as you're logged into Google, it works.
-
 #### Auth Mode 2: Client-Only (Alpha — OAuth popup, works from plain HTML)
 
-The simplest mode. Just provide a **Google OAuth2 Client ID** — no secrets, no server, no backend. DriveSignal loads Google Identity Services in the browser and pops up a one-time consent dialog. After that, tokens auto-renew silently.
-
-Works from a plain HTML file opened via `file://` or any static host.
+Provide a Google OAuth2 Client ID. DriveSignal loads Google Identity Services in the browser and presents a one-time consent dialog. Tokens auto-renew silently afterward. Works from a plain HTML file opened via `file://` or any static host.
 
 **GCP setup** (one-time):
 1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
@@ -370,7 +417,6 @@ Works from a plain HTML file opened via `file://` or any static host.
 4. Copy the Client ID
 
 ```html
-<!-- index.html — open directly in a browser, no server needed -->
 <script type="module">
   import { FastRTC } from './dist/fastrtc.es.js';
 
@@ -381,17 +427,13 @@ Works from a plain HTML file opened via `file://` or any static host.
     }
   });
 
-  // First call: user sees a Google sign-in popup (one time)
-  // After that: tokens refresh silently in the background
   const code = await rtc.createRoom('MY-ROOM');
 </script>
 ```
 
-That's it. No `clientSecret`, no `refreshToken`, no service account key. The browser handles everything.
-
 #### Auth Mode 3: Service Account (Recommended for automation — never expires)
 
-Create a GCP service account, download the JSON key, and share the spreadsheet with its email. No user interaction, no token refresh — it mints its own tokens via JWT + Web Crypto:
+Create a GCP service account, download the JSON key, and share the spreadsheet with its email.
 
 ```javascript
 const rtc = new FastRTC({
@@ -438,7 +480,7 @@ const rtc = new FastRTC({
 
 #### Auth Mode 6: API Key (Read-only)
 
-If you only have a Google API key (no OAuth), a peer can **read** the spreadsheet but not write. Useful for a monitoring dashboard or observer:
+If you only have a Google API key (no OAuth), a peer can read the spreadsheet but not write:
 
 ```javascript
 const rtc = new FastRTC({
@@ -449,11 +491,7 @@ const rtc = new FastRTC({
 });
 ```
 
-When `driveSignal` is set, FastRTC automatically uses `DriveSignal` instead of the default `TorrentSignal`. Everything else — room creation, peer connection, file transfers, messaging, proxying — works identically.
-
-### Using DriveSignal Directly
-
-You can also import `DriveSignal` standalone for custom signaling flows:
+By default, FastRTC signals over WebTorrent trackers. Setting the `driveSignal` option switches the signaling channel to the configured Google Spreadsheet. Room creation, peer connection, file transfers, messaging, proxying works identically.
 
 ```javascript
 import { DriveSignal } from 'fastrtc';
