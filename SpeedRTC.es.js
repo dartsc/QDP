@@ -1,5 +1,8 @@
-class Ce {
-  constructor(e, { channelCount: t = 4, ordered: s = !1, protocol: n = "fastrtc" } = {}) {
+var ve = Object.defineProperty;
+var Oe = (h, e, t) => e in h ? ve(h, e, { enumerable: !0, configurable: !0, writable: !0, value: t }) : h[e] = t;
+var he = (h, e, t) => Oe(h, typeof e != "symbol" ? e + "" : e, t);
+class Le {
+  constructor(e, { channelCount: t = 4, ordered: s = !1, protocol: n = "speedrtc" } = {}) {
     this.pc = e, this.channelCount = t, this.ordered = s, this.protocol = n, this.channels = [], this.openChannels = /* @__PURE__ */ new Set(), this._rrIndex = 0, this._openArray = [], this._openArrayDirty = !0, this._onMessage = null, this._onOpen = null, this._onClose = null;
   }
   onMessage(e) {
@@ -13,7 +16,7 @@ class Ce {
   }
   createChannels() {
     for (let e = 0; e < this.channelCount; e++) {
-      const t = `fastrtc-${e}`, s = this.pc.createDataChannel(t, {
+      const t = `speedrtc-${e}`, s = this.pc.createDataChannel(t, {
         ordered: this.ordered,
         protocol: this.protocol,
         id: e,
@@ -106,8 +109,8 @@ class Ce {
     });
   }
 }
-const re = 0.3, Re = 2e4, Te = 8e3, Ie = 8e3, Ae = 4;
-class xe {
+const le = 0.3, Ne = 2e4, De = 8e3, We = 5e3, Be = 4, $e = 1;
+class qe {
   constructor(e) {
     this.url = e, this.ws = null, this.connected = !1, this.latency = 0, this.load = 0, this.score = 1, this._lastSentAt = 0, this._awaitingResponse = !1, this._onMessage = null;
   }
@@ -120,7 +123,7 @@ class xe {
         } catch {
         }
         t(new Error(`timeout: ${this.url}`));
-      }, Ie);
+      }, We);
       try {
         this.ws = new WebSocket(this.url), this.ws.onopen = () => {
           clearTimeout(s), this.connected = !0, e(this);
@@ -140,18 +143,27 @@ class xe {
   }
   close() {
     if (this.connected = !1, this.ws) {
-      this.ws.onclose = null, this.ws.onerror = null, this.ws.onmessage = null;
-      try {
-        this.ws.close();
-      } catch {
+      const e = this.ws;
+      if (this.ws = null, e.onmessage = null, e.onerror = null, e.onclose = null, e.readyState === WebSocket.CONNECTING)
+        e.onopen = () => {
+          try {
+            e.close();
+          } catch {
+          }
+        };
+      else {
+        e.onopen = null;
+        try {
+          e.close();
+        } catch {
+        }
       }
-      this.ws = null;
     }
   }
   _handleRaw(e) {
     if (this._awaitingResponse && this._lastSentAt > 0) {
       const s = performance.now() - this._lastSentAt;
-      this._awaitingResponse = !1, this.latency = this.latency === 0 ? s : re * s + (1 - re) * this.latency;
+      this._awaitingResponse = !1, this.latency = this.latency === 0 ? s : le * s + (1 - le) * this.latency;
     }
     let t;
     try {
@@ -170,9 +182,9 @@ class xe {
     this.score = t * 0.65 + s * 0.35;
   }
 }
-class Ee {
+class Re {
   constructor(e) {
-    this.nodes = e.map((t) => new xe(t)), this._active = [], this._primary = null, this._pingTimer = null, this._rebalanceTimer = null, this.onMessage = null, this.onRebalance = null;
+    this.nodes = e.map((t) => new qe(t)), this._active = [], this._primary = null, this._pingTimer = null, this._rebalanceTimer = null, this._closed = !1, this.onMessage = null, this.onRebalance = null, this.onNodeJoined = null;
   }
   get connected() {
     return this._active.some((e) => e.connected);
@@ -181,12 +193,26 @@ class Ee {
     return this._active.filter((e) => e.ws).map((e) => e.ws);
   }
   async connect() {
-    const e = await Promise.allSettled(
-      this.nodes.map((t) => (t._onMessage = (s, n) => this._onRawMessage(s, n), t.connect()))
-    );
-    if (this._active = e.filter((t) => t.status === "fulfilled").map((t) => t.value).slice(0, Ae), this._active.length === 0)
-      throw new Error("SignalManager: all trackers failed to connect");
-    return this._primary = this._best(), this._startTimers(), this._active.length;
+    return new Promise((e, t) => {
+      let s = 0, n = !1;
+      const i = this.nodes.length, r = () => {
+        if (!n && this._active.length >= $e) {
+          n = !0, this._primary = this._best(), this._startTimers(), e(this._active.length);
+          return;
+        }
+        s >= i && !n && (this._active.length > 0 ? (n = !0, this._primary = this._best(), this._startTimers(), e(this._active.length)) : t(new Error("SignalManager: all trackers failed to connect")));
+      };
+      for (const c of this.nodes)
+        c._onMessage = (o, a) => this._onRawMessage(o, a), c.connect().then((o) => {
+          if (s++, this._closed) {
+            o.close(), r();
+            return;
+          }
+          this._active.length < Be ? (this._active.push(o), n && (this._rebalance(), this.onNodeJoined && this.onNodeJoined(o.url))) : o.close(), r();
+        }).catch(() => {
+          s++, r();
+        });
+    });
   }
   send(e) {
     var t, s;
@@ -200,8 +226,8 @@ class Ee {
     for (const t of this._active) t.send(e);
   }
   close() {
-    this._stopTimers();
-    for (const e of this._active) e.close();
+    this._stopTimers(), this._closed = !0;
+    for (const e of this.nodes) e.close();
     this._active = [], this._primary = null;
   }
   getStats() {
@@ -226,9 +252,9 @@ class Ee {
     this._pingTimer = setInterval(() => {
       for (const e of this._active)
         e.connected && !e._awaitingResponse && (e._lastSentAt = performance.now(), e._awaitingResponse = !0);
-    }, Te), this._rebalanceTimer = setInterval(() => {
+    }, De), this._rebalanceTimer = setInterval(() => {
       this._rebalance();
-    }, Re);
+    }, Ne);
   }
   _stopTimers() {
     clearInterval(this._pingTimer), clearInterval(this._rebalanceTimer), this._pingTimer = null, this._rebalanceTimer = null;
@@ -237,36 +263,46 @@ class Ee {
     this.onMessage && this.onMessage(e, t);
   }
 }
-class Ue {
+const de = [
+  "wss://tracker.openwebtorrent.com",
+  "wss://tracker.novage.com.ua",
+  "wss://peertube2.cpy.re:443/tracker/socket",
+  "wss://video.blender.org:443/tracker/socket",
+  "wss://fediverse.tv:443/tracker/socket",
+  "wss://tracker.files.fm:7073/announce",
+  "wss://peertube.cpy.re:443/tracker/socket",
+  "wss://videos.pair2jeux.tube:443/tracker/socket",
+  "wss://videos.npo.city:443/tracker/socket",
+  "wss://tube.rebellion.global:443/tracker/socket",
+  "wss://peertube.tv:443/tracker/socket",
+  "wss://framatube.org:443/tracker/socket",
+  "wss://diode.zone:443/tracker/socket",
+  "wss://tilvids.com:443/tracker/socket"
+];
+class se {
   constructor(e, t, s = null) {
     this.roomCode = e, this.isOfferer = t;
     const n = Array.from("FRTC" + e).map((r) => r.charCodeAt(0).toString(16).padStart(2, "0")).join("");
     this.infoHash = n.padEnd(40, "0"), this.peerId = Array.from(crypto.getRandomValues(new Uint8Array(20))).map((r) => r.toString(16).padStart(2, "0")).join("");
-    const i = s != null && s.length ? [...s] : [
-      "wss://tracker.openwebtorrent.com",
-      "wss://tracker.novage.com.ua",
-      "wss://peertube2.cpy.re:443/tracker/socket",
-      "wss://video.blender.org:443/tracker/socket",
-      "wss://fediverse.tv:443/tracker/socket",
-      "wss://tracker.files.fm:7073/announce",
-      "wss://peertube.cpy.re:443/tracker/socket",
-      "wss://videos.pair2jeux.tube:443/tracker/socket",
-      "wss://videos.npo.city:443/tracker/socket",
-      "wss://tube.rebellion.global:443/tracker/socket",
-      "wss://peertube.tv:443/tracker/socket",
-      "wss://framatube.org:443/tracker/socket",
-      "wss://diode.zone:443/tracker/socket",
-      "wss://tilvids.com:443/tracker/socket"
-    ];
-    this._manager = new Ee(i), this.remotePeerId = null, this._preferredNodeUrl = null, this.onMessage = null, this.onOpen = null, this.onClose = null, this._announceInterval = null;
+    const i = s != null && s.length ? [...s] : de;
+    this._manager = new Re(i), this._managerPreConnected = !1, this.remotePeerId = null, this._preferredNodeUrl = null, this.onMessage = null, this.onOpen = null, this.onClose = null, this._announceInterval = null, this._localOfferPayload = null;
+  }
+  useManager(e) {
+    this._manager = e, this._managerPreConnected = !0;
   }
   get sockets() {
     return this._manager.sockets;
   }
   connect() {
-    this._manager.onMessage = (e, t) => this._handleMessage(e, t), this._manager.onRebalance = (e, t) => {
-      !this.remotePeerId && this.isOfferer && this._announce(!1);
-    }, this._manager.connect().then(() => {
+    if (this._manager.onMessage = (e, t) => this._handleMessage(e, t), this._manager.onRebalance = () => {
+      this.remotePeerId || this._announce(!1);
+    }, this._manager.onNodeJoined = () => {
+      this.remotePeerId || this._announce();
+    }, this._managerPreConnected && this._manager.connected) {
+      this.onOpen && this.onOpen(0), this._startAnnouncing();
+      return;
+    }
+    this._manager.connect().then(() => {
       this.onOpen && this.onOpen(0), this._startAnnouncing();
     }).catch(() => {
       this.onClose && this.onClose(0);
@@ -282,25 +318,27 @@ class Ue {
       peer_id: this.peerId
     };
     if (this.remotePeerId) {
-      s.to_peer_id = this.remotePeerId, s.answer = { type: "answer", sdp: t }, s.offer_id = "fastrtc-relay";
+      s.to_peer_id = this.remotePeerId, s.answer = { type: "answer", sdp: t }, s.offer_id = "speedrtc-relay";
       const n = JSON.stringify(s);
       this._preferredNodeUrl ? this._manager.sendTo(this._preferredNodeUrl, n) || this._manager.send(n) : this._manager.send(n);
-    } else this.isOfferer && (s.numwant = 1, s.offers = [{
-      offer_id: "fastrtc-relay",
+    } else this.isOfferer && e.type === "offer" && (this._localOfferPayload = t, s.numwant = 1, s.offers = [{
+      offer_id: "speedrtc-relay",
       offer: { type: "offer", sdp: t }
     }], this._manager.broadcast(JSON.stringify(s)));
   }
   _announce(e = !0) {
-    const t = JSON.stringify({
+    const t = {
       action: "announce",
       info_hash: this.infoHash,
       peer_id: this.peerId,
       numwant: 1
-    });
-    e ? this._manager.broadcast(t) : this._manager.send(t);
+    };
+    this.isOfferer && this._localOfferPayload && (t.offers = [{ offer_id: "speedrtc-relay", offer: { type: "offer", sdp: this._localOfferPayload } }]);
+    const s = JSON.stringify(t);
+    e ? this._manager.broadcast(s) : this._manager.send(s);
   }
   _startAnnouncing() {
-    this.isOfferer ? (this._announce(), this._announceInterval = setInterval(() => this._announce(), 2e3)) : this._announce();
+    this._announce(), this._announceInterval = setInterval(() => this._announce(), 2e3);
   }
   _stopAnnouncing() {
     this._announceInterval && (clearInterval(this._announceInterval), this._announceInterval = null);
@@ -333,14 +371,19 @@ class Ue {
         answer: { type: "answer", sdp: JSON.stringify({ type: "peer-joined" }) }
       }));
     }
-    s.action === "announce" && s.peer_id && s.peer_id !== this.peerId && this.isOfferer && !this.remotePeerId && (this.remotePeerId = s.peer_id, this._preferredNodeUrl = t.url, this._stopAnnouncing(), this.onMessage && this.onMessage({ type: "peer-joined" }));
+    s.action === "announce" && s.peer_id && s.peer_id !== this.peerId && this.isOfferer && !this.remotePeerId && (this.remotePeerId = s.peer_id, this._preferredNodeUrl = t.url, this.onMessage && this.onMessage({ type: "peer-joined" }));
   }
 }
-const V = "https://oauth2.googleapis.com/token", oe = "https://www.googleapis.com/auth/spreadsheets", Me = "https://accounts.google.com/gsi/client";
-let ae = !1, G = null;
-class g {
+he(se, "DEFAULT_TRACKER_URLS", de);
+const Y = "https://oauth2.googleapis.com/token", ue = "https://www.googleapis.com/auth/spreadsheets", He = "https://accounts.google.com/gsi/client";
+let fe = !1, J = null;
+const Q = /* @__PURE__ */ new Map();
+function _e(h) {
+  return h ? h.refreshToken ? `refresh:${h.clientId}:${h.refreshToken.slice(-12)}` : h.serviceAccount ? `service:${h.serviceAccount.client_email}` : h.accessToken ? `static:${h.accessToken.slice(-12)}` : null : null;
+}
+class p {
   constructor(e, t, s = {}) {
-    if (this.roomCode = e, this.isOfferer = t, this.spreadsheetId = s.spreadsheetId, this.pollInterval = s.pollInterval || 1500, this.sheetName = s.sheetName || e, !this.spreadsheetId)
+    if (this.roomCode = e, this.isOfferer = t, this._driveConfig = s, this.spreadsheetId = s.spreadsheetId, this.pollInterval = s.pollInterval || 500, this.sheetName = s.sheetName || e, !this.spreadsheetId)
       throw new Error("DriveSignal requires a spreadsheetId");
     if (this._authMode = null, this._accessToken = null, this._tokenExpiry = 0, this._apiKey = s.apiKey || null, this._rawToken = null, this._rawOuid = "", this._rawGid = "0", this._rawSid = null, this._rawRev = 1, this._rawReqId = 0, this._myWriteRow = 1, this._lastRawValues = null, this._clientId = s.clientId || null, this._clientSecret = s.clientSecret || null, this._refreshToken = s.refreshToken || null, this._serviceAccount = s.serviceAccount || null, this._signingKey = null, this._gisTokenClient = null, this._gisResolve = null, s.raw && s.raw.token)
       this._authMode = "raw", this._rawToken = s.raw.token, this._rawOuid = s.raw.ouid || "", this._rawGid = String(s.raw.gid ?? 0), this._rawRev = s.raw.rev ?? 1, this._rawSid = Array.from(
@@ -361,20 +404,37 @@ class g {
       throw new Error(
         "DriveSignal requires one of: raw ({ token }), clientId (client-only), accessToken, refreshToken (+ clientId/clientSecret), serviceAccount, or apiKey"
       );
-    this.peerId = g._generatePeerId(), this.remotePeerId = null, this.onMessage = null, this.onOpen = null, this.onClose = null, this.connected = !1, this._pollTimer = null, this._myColumn = null, this._remoteColIndex = null, this._readCursor = 1, this._destroyed = !1, this._baseUrl = "https://sheets.googleapis.com/v4/spreadsheets";
+    this.peerId = p._generatePeerId(), this.remotePeerId = null, this.onMessage = null, this.onOpen = null, this.onClose = null, this.connected = !1, this._pollTimer = null, this._myColumn = null, this._remoteColIndex = null, this._readCursor = 1, this._destroyed = !1, this._baseUrl = "https://sheets.googleapis.com/v4/spreadsheets";
+  }
+  async warmup() {
+    if (this._authMode === "refresh" || this._authMode === "service")
+      try {
+        await this._ensureToken();
+      } catch {
+      }
+  }
+  static async warmupToken(e) {
+    const t = _e(e);
+    if (!t) return;
+    const s = Q.get(t);
+    if (!(s && Date.now() < s.expiry - 5e3))
+      try {
+        await new p("__warmup__", !1, e)._ensureToken();
+      } catch {
+      }
   }
   async connect() {
     try {
       if (this._authMode === "raw") {
         if (await this._registerColumn(), this._lastRawValues && this._myColumn) {
-          const e = g._colIndex(this._myColumn);
+          const e = p._colIndex(this._myColumn);
           let t = 0;
           for (let s = 0; s < this._lastRawValues.length; s++)
             this._lastRawValues[s] && this._lastRawValues[s][e] && (t = s + 1);
           this._myWriteRow = t;
         }
       } else
-        await this._ensureToken(), await this._ensureSheet(), await this._registerColumn(), this._myWriteRow = 2;
+        await this._ensureToken(), await this._setupSheet(), this._myWriteRow = 2;
       this.connected = !0, this.onOpen && this.onOpen(0), this._startPolling();
     } catch (e) {
       console.error("[DriveSignal] connect failed:", e), this.onClose && this.onClose(0);
@@ -401,36 +461,40 @@ class g {
       } catch {
       }
   }
-  async _ensureSheet() {
-    const e = `${this.sheetName}!A1`;
+  async _setupSheet() {
+    let e = [];
     try {
-      await this._sheetsRequest(
-        `/${this.spreadsheetId}/values/${encodeURIComponent(e)}`,
+      const n = await this._sheetsRequest(
+        `/${this.spreadsheetId}/values/${encodeURIComponent(`${this.sheetName}!1:1`)}`,
         "GET"
       );
-    } catch (t) {
-      if (t.status === 400 || t.status === 404)
+      e = n.values ? n.values[0] : [];
+    } catch (n) {
+      if (n.status === 400 || n.status === 404)
         await this._sheetsRequest(
           `/${this.spreadsheetId}:batchUpdate`,
           "POST",
-          {
-            requests: [{
-              addSheet: { properties: { title: this.sheetName } }
-            }]
-          }
-        );
+          { requests: [{ addSheet: { properties: { title: this.sheetName } } }] }
+        ), e = [];
       else
-        throw t;
+        throw n;
     }
+    const t = e.indexOf(this.peerId);
+    if (t >= 0) {
+      this._myColumn = p._colLetter(t);
+      return;
+    }
+    const s = e.length;
+    this._myColumn = p._colLetter(s), await this._writeCell(`${this.sheetName}!${this._myColumn}1`, this.peerId);
   }
   async _registerColumn() {
     const e = await this._readHeaders(), t = e.indexOf(this.peerId);
     if (t >= 0) {
-      this._myColumn = g._colLetter(t);
+      this._myColumn = p._colLetter(t);
       return;
     }
     const s = e.length;
-    this._myColumn = g._colLetter(s), await this._writeCell(`${this.sheetName}!${this._myColumn}1`, this.peerId);
+    this._myColumn = p._colLetter(s), await this._writeCell(`${this.sheetName}!${this._myColumn}1`, this.peerId);
   }
   _startPolling() {
     this._poll(), this._pollTimer = setInterval(() => this._poll(), this.pollInterval);
@@ -463,7 +527,7 @@ class g {
           }
         }
         if (this._authMode === "raw" && this._myColumn) {
-          const s = g._colIndex(this._myColumn);
+          const s = p._colIndex(this._myColumn);
           let n = 0;
           for (let i = 0; i < e.length; i++)
             e[i] && e[i][s] && (n = i + 1);
@@ -483,11 +547,20 @@ class g {
       const d = new Error(`Sheets API ${t} ${e} → ${a.status}`);
       throw d.status = a.status, d;
     }
-    const h = await a.text();
-    return h ? JSON.parse(h) : {};
+    const l = await a.text();
+    return l ? JSON.parse(l) : {};
   }
   async _ensureToken() {
-    this._authMode !== "apikey" && (this._accessToken && Date.now() < this._tokenExpiry - 5e3 || (this._authMode === "refresh" ? await this._refreshAccessToken() : this._authMode === "service" ? await this._mintServiceAccountToken() : this._authMode === "client" && await this._requestClientToken()));
+    if (this._authMode === "apikey" || this._accessToken && Date.now() < this._tokenExpiry - 5e3) return;
+    const e = _e(this._driveConfig);
+    if (e) {
+      const t = Q.get(e);
+      if (t && Date.now() < t.expiry - 5e3) {
+        this._accessToken = t.token, this._tokenExpiry = t.expiry;
+        return;
+      }
+    }
+    this._authMode === "refresh" ? await this._refreshAccessToken() : this._authMode === "service" ? await this._mintServiceAccountToken() : this._authMode === "client" && await this._requestClientToken(), e && this._accessToken && Q.set(e, { token: this._accessToken, expiry: this._tokenExpiry });
   }
   async _refreshAccessToken() {
     const e = new URLSearchParams({
@@ -495,7 +568,7 @@ class g {
       client_id: this._clientId,
       client_secret: this._clientSecret,
       refresh_token: this._refreshToken
-    }), t = await fetch(V, {
+    }), t = await fetch(Y, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: e.toString()
@@ -508,14 +581,14 @@ class g {
   async _mintServiceAccountToken() {
     const e = Math.floor(Date.now() / 1e3), t = {
       iss: this._serviceAccount.client_email,
-      scope: oe,
-      aud: V,
+      scope: ue,
+      aud: Y,
       iat: e,
       exp: e + 3600
-    }, s = await g._signJwt(t, this._serviceAccount.private_key, this), n = new URLSearchParams({
+    }, s = await p._signJwt(t, this._serviceAccount.private_key, this), n = new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
       assertion: s
-    }), i = await fetch(V, {
+    }), i = await fetch(Y, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: n.toString()
@@ -526,9 +599,9 @@ class g {
     this._accessToken = r.access_token, this._tokenExpiry = Date.now() + (r.expires_in ? r.expires_in * 1e3 - 3e5 : 3300 * 1e3);
   }
   async _requestClientToken() {
-    return await g._loadGisScript(), this._gisTokenClient || (this._gisTokenClient = google.accounts.oauth2.initTokenClient({
+    return await p._loadGisScript(), this._gisTokenClient || (this._gisTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: this._clientId,
-      scope: oe,
+      scope: ue,
       callback: (e) => {
         if (e.error) {
           console.error("[DriveSignal] GIS token error:", e.error), this._gisResolve && this._gisResolve();
@@ -541,12 +614,12 @@ class g {
     });
   }
   static _loadGisScript() {
-    return ae && typeof google < "u" && google.accounts ? Promise.resolve() : G || (G = new Promise((e, t) => {
+    return fe && typeof google < "u" && google.accounts ? Promise.resolve() : J || (J = new Promise((e, t) => {
       const s = document.createElement("script");
-      s.src = Me, s.async = !0, s.onload = () => {
-        ae = !0, e();
+      s.src = He, s.async = !0, s.onload = () => {
+        fe = !0, e();
       }, s.onerror = () => t(new Error("[DriveSignal] Failed to load Google Identity Services script")), document.head.appendChild(s);
-    }), G);
+    }), J);
   }
   async _readHeaders() {
     if (this._authMode === "raw")
@@ -564,7 +637,7 @@ class g {
   }
   async _writeCell(e, t) {
     if (this._authMode === "raw") {
-      const { row: s, col: n } = g._parseRange(e);
+      const { row: s, col: n } = p._parseRange(e);
       return this._rawWriteCell(s, n, t);
     }
     await this._sheetsRequest(
@@ -575,7 +648,7 @@ class g {
   }
   async _appendToColumn(e, t) {
     if (this._authMode === "raw") {
-      const i = g._colIndex(e), r = this._myWriteRow;
+      const i = p._colIndex(e), r = this._myWriteRow;
       return this._myWriteRow++, this._rawWriteCell(r, i, t);
     }
     const s = this._myWriteRow;
@@ -612,12 +685,12 @@ class g {
       usp: "drive_web",
       cros_files: "false",
       nded: "false"
-    }), a = `https://docs.google.com/spreadsheets/u/0/d/${this.spreadsheetId}/save?${o}`, h = new FormData();
-    h.append("rev", String(this._rawRev)), h.append("bundles", c);
+    }), a = `https://docs.google.com/spreadsheets/u/0/d/${this.spreadsheetId}/save?${o}`, l = new FormData();
+    l.append("rev", String(this._rawRev)), l.append("bundles", c);
     try {
       await fetch(a, {
         method: "POST",
-        body: h,
+        body: l,
         credentials: "include",
         mode: "no-cors"
       });
@@ -631,7 +704,7 @@ class g {
         delete window[t], e([]);
       }, 8e3);
       window[t] = (i) => {
-        clearTimeout(s), delete window[t], e(g._parseGvizTable(i));
+        clearTimeout(s), delete window[t], e(p._parseGvizTable(i));
       };
       const n = document.createElement("script");
       n.src = `https://docs.google.com/spreadsheets/d/${this.spreadsheetId}/gviz/tq?tqx=responseHandler:${t}&gid=${this._rawGid}&headers=0&tq=${encodeURIComponent("SELECT *")}`, n.onerror = () => {
@@ -651,7 +724,7 @@ class g {
   static _parseRange(e) {
     const s = (e.includes("!") ? e.split("!")[1] : e).match(/^([A-Z]+)(\d+)$/);
     return s ? {
-      col: g._colIndex(s[1]),
+      col: p._colIndex(s[1]),
       row: parseInt(s[2], 10) - 1
     } : { row: 0, col: 0 };
   }
@@ -666,16 +739,16 @@ class g {
     return t;
   }
   static async _signJwt(e, t, s) {
-    s._signingKey || (s._signingKey = await g._importPem(t));
+    s._signingKey || (s._signingKey = await p._importPem(t));
     const n = { alg: "RS256", typ: "JWT" }, i = [
-      g._b64url(JSON.stringify(n)),
-      g._b64url(JSON.stringify(e))
+      p._b64url(JSON.stringify(n)),
+      p._b64url(JSON.stringify(e))
     ], r = new TextEncoder().encode(i.join(".")), c = await crypto.subtle.sign(
       { name: "RSASSA-PKCS1-v1_5" },
       s._signingKey,
       r
     );
-    return i.push(g._b64urlBuf(c)), i.join(".");
+    return i.push(p._b64urlBuf(c)), i.join(".");
   }
   static async _importPem(e) {
     const t = e.replace(/-----BEGIN (?:RSA )?PRIVATE KEY-----/, "").replace(/-----END (?:RSA )?PRIVATE KEY-----/, "").replace(/\s/g, ""), s = atob(t), n = new Uint8Array(s.length);
@@ -698,7 +771,76 @@ class g {
     return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
 }
-class me {
+class pe {
+  constructor(e, t, s) {
+    this.roomCode = e, this.isOfferer = t, this.serverUrl = s, this.ws = null, this.connected = !1, this.remotePeerId = null, this.onMessage = null, this.onOpen = null, this.onClose = null, this._preConnectedWs = null;
+  }
+  usePreConnectedSocket(e) {
+    this._preConnectedWs = e;
+  }
+  connect() {
+    if (this._preConnectedWs && this._preConnectedWs.readyState === WebSocket.OPEN) {
+      this.ws = this._preConnectedWs, this._preConnectedWs = null, this.connected = !0, this._setup(), this._joinRoom(), this.onOpen && this.onOpen(0);
+      return;
+    }
+    this.ws = new WebSocket(this.serverUrl), this.ws.onopen = () => {
+      this.connected = !0, this._setup(), this._joinRoom(), this.onOpen && this.onOpen(0);
+    }, this.ws.onerror = () => {
+    }, this.ws.onclose = () => {
+      this.connected = !1, this.onClose && this.onClose(0);
+    };
+  }
+  send(e) {
+    !this.ws || this.ws.readyState !== WebSocket.OPEN || this.ws.send(JSON.stringify({
+      ...e,
+      roomCode: this.roomCode
+    }));
+  }
+  close() {
+    if (this.connected = !1, this.ws) {
+      this.ws.onopen = null, this.ws.onclose = null, this.ws.onerror = null, this.ws.onmessage = null;
+      try {
+        this.ws.close();
+      } catch {
+      }
+      this.ws = null;
+    }
+  }
+  _setup() {
+    this.ws.onmessage = (e) => {
+      let t;
+      try {
+        t = JSON.parse(e.data);
+      } catch {
+        return;
+      }
+      (t.type === "peer-joined" || t.type === "offer" || t.type === "answer" || t.type === "ice-candidate") && (this.remotePeerId = "remote"), this.onMessage && this.onMessage(t);
+    }, this.ws.onclose = () => {
+      this.connected = !1, this.onClose && this.onClose(0);
+    };
+  }
+  _joinRoom() {
+    this.ws.send(JSON.stringify({
+      type: "join-room",
+      roomCode: this.roomCode
+    }));
+  }
+  static preConnect(e) {
+    return new Promise((t, s) => {
+      const n = new WebSocket(e);
+      n.onopen = () => t(n), n.onerror = () => s(new Error("preConnect failed")), setTimeout(() => {
+        if (n.readyState !== WebSocket.OPEN) {
+          try {
+            n.close();
+          } catch {
+          }
+          s(new Error("preConnect timeout"));
+        }
+      }, 5e3);
+    });
+  }
+}
+class Te {
   constructor({ probeIntervalMs: e = 2e3, emaAlpha: t = 0.3 } = {}) {
     this.probeIntervalMs = e, this.emaAlpha = t, this.links = /* @__PURE__ */ new Map(), this._probeTimer = null, this._onQualityUpdate = null;
   }
@@ -788,9 +930,9 @@ class me {
     e.score = Math.max(0.01, t * 0.4 + s * 0.35 + n * 0.25);
   }
 }
-class ve {
+class Fe {
   constructor({ senders: e = [], linkIds: t = [], monitor: s = null } = {}) {
-    this.senders = e, this.linkIds = t, this.monitor = s || new me();
+    this.senders = e, this.linkIds = t, this.monitor = s || new Te();
     for (const n of this.linkIds)
       this.monitor.links.has(n) || this.monitor.addLink(n);
     this._wrr = {
@@ -862,7 +1004,7 @@ class ve {
     const t = new Array(e), s = this._wrr.weights, n = /* @__PURE__ */ new Map();
     let i = 0;
     for (let o = 0; o < this.linkIds.length; o++) {
-      const a = this.linkIds[o], h = s.get(a) || 1 / this.linkIds.length, d = Math.round(h * e);
+      const a = this.linkIds[o], l = s.get(a) || 1 / this.linkIds.length, d = Math.round(l * e);
       n.set(o, d), i += d;
     }
     if (i < e) {
@@ -870,8 +1012,8 @@ class ve {
       n.set(o, (n.get(o) || 0) + (e - i));
     } else if (i > e)
       for (let o = this.linkIds.length - 1; o >= 0 && i > e; o--) {
-        const a = n.get(o) || 0, h = Math.min(a, i - e);
-        n.set(o, a - h), i -= h;
+        const a = n.get(o) || 0, l = Math.min(a, i - e);
+        n.set(o, a - l), i -= l;
       }
     let r = 0;
     const c = new Map(n);
@@ -905,33 +1047,33 @@ class ve {
     return s.buffer;
   }
 }
-const K = 13, ge = 64 * 1024, L = {
+const K = 13, Ie = 64 * 1024, L = {
   DATA: 1,
   ACK: 2,
   FIN: 4,
   PROBE: 8,
   META: 16
 };
-function ee({ transferId: l, chunkIndex: e, totalChunks: t, flags: s, payload: n }) {
+function ie({ transferId: h, chunkIndex: e, totalChunks: t, flags: s, payload: n }) {
   const i = n ? n instanceof Uint8Array ? n : new Uint8Array(n) : new Uint8Array(0), r = new ArrayBuffer(K + i.byteLength), c = new DataView(r);
-  return c.setUint32(0, l, !0), c.setUint32(4, e, !0), c.setUint32(8, t, !0), c.setUint8(12, s), i.byteLength > 0 && new Uint8Array(r, K).set(i), r;
+  return c.setUint32(0, h, !0), c.setUint32(4, e, !0), c.setUint32(8, t, !0), c.setUint8(12, s), i.byteLength > 0 && new Uint8Array(r, K).set(i), r;
 }
-function Pe(l) {
-  const e = new DataView(l);
+function je(h) {
+  const e = new DataView(h);
   return {
     transferId: e.getUint32(0, !0),
     chunkIndex: e.getUint32(4, !0),
     totalChunks: e.getUint32(8, !0),
     flags: e.getUint8(12),
-    payload: l.byteLength > K ? new Uint8Array(l, K) : null
+    payload: h.byteLength > K ? new Uint8Array(h, K) : null
   };
 }
-function ce(l, e, t = ge) {
-  const s = new Uint8Array(l), n = Math.ceil(s.byteLength / t), i = [];
+function me(h, e, t = Ie) {
+  const s = new Uint8Array(h), n = Math.ceil(s.byteLength / t), i = [];
   for (let r = 0; r < n; r++) {
     const c = r * t, o = Math.min(c + t, s.byteLength), a = s.slice(c, o);
     i.push(
-      ee({
+      ie({
         transferId: e,
         chunkIndex: r,
         totalChunks: n,
@@ -942,23 +1084,23 @@ function ce(l, e, t = ge) {
   }
   return i;
 }
-function Oe(l, e) {
+function ze(h, e) {
   const t = JSON.stringify(e), n = new TextEncoder().encode(t);
-  return ee({
-    transferId: l,
+  return ie({
+    transferId: h,
     chunkIndex: 0,
     totalChunks: 0,
     flags: L.META,
     payload: n
   });
 }
-function Le(l) {
+function Ge(h) {
   const e = new TextDecoder();
-  return JSON.parse(e.decode(l));
+  return JSON.parse(e.decode(h));
 }
-function De(l) {
+function Je(h) {
   const e = new Uint8Array(8);
-  return new DataView(e.buffer).setFloat64(0, l, !0), ee({
+  return new DataView(e.buffer).setFloat64(0, h, !0), ie({
     transferId: 0,
     chunkIndex: 0,
     totalChunks: 0,
@@ -966,11 +1108,11 @@ function De(l) {
     payload: e
   });
 }
-function Ne(l) {
-  return new DataView(l.buffer, l.byteOffset, l.byteLength).getFloat64(0, !0);
+function Ke(h) {
+  return new DataView(h.buffer, h.byteOffset, h.byteLength).getFloat64(0, !0);
 }
-const he = 1, le = 2, Be = new TextEncoder(), $e = new TextDecoder();
-class We {
+const ge = 1, we = 2, Ve = new TextEncoder(), Ye = new TextDecoder();
+class Qe {
   constructor(e) {
     this._send = e, this._listeners = {};
   }
@@ -990,19 +1132,19 @@ class We {
         }
   }
   async send(e) {
-    const t = Be.encode(e), s = new ArrayBuffer(1 + t.length);
-    new Uint8Array(s)[0] = he, new Uint8Array(s, 1).set(t), await this._send(s);
+    const t = Ve.encode(e), s = new ArrayBuffer(1 + t.length);
+    new Uint8Array(s)[0] = ge, new Uint8Array(s, 1).set(t), await this._send(s);
   }
   async sendBinary(e) {
     const t = new Uint8Array(e), s = new ArrayBuffer(1 + t.length);
-    new Uint8Array(s)[0] = le, new Uint8Array(s, 1).set(t), await this._send(s);
+    new Uint8Array(s)[0] = we, new Uint8Array(s, 1).set(t), await this._send(s);
   }
   handleIncoming(e) {
     const t = new Uint8Array(e), s = t[0];
-    if (s === he) {
-      const n = $e.decode(t.slice(1));
+    if (s === ge) {
+      const n = Ye.decode(t.slice(1));
       this._emit("text", n);
-    } else s === le && this._emit("binary", e.slice(1));
+    } else s === we && this._emit("binary", e.slice(1));
   }
 }
 const y = {
@@ -1011,47 +1153,47 @@ const y = {
   BODY: 3,
   END: 4,
   ERROR: 5
-}, W = new TextEncoder(), B = new TextDecoder();
-function qe(l, e, t, s = {}, n = null) {
-  const i = W.encode(e), r = W.encode(t), c = W.encode(JSON.stringify(s)), o = n ? new Uint8Array(n) : new Uint8Array(0), a = 6 + i.length + 2 + r.length + 4 + c.length + o.length, h = new ArrayBuffer(a), d = new DataView(h), f = new Uint8Array(h);
+}, $ = new TextEncoder(), W = new TextDecoder();
+function Xe(h, e, t, s = {}, n = null) {
+  const i = $.encode(e), r = $.encode(t), c = $.encode(JSON.stringify(s)), o = n ? new Uint8Array(n) : new Uint8Array(0), a = 6 + i.length + 2 + r.length + 4 + c.length + o.length, l = new ArrayBuffer(a), d = new DataView(l), f = new Uint8Array(l);
   let u = 0;
-  return d.setUint8(u, y.REQUEST), u += 1, d.setUint32(u, l, !0), u += 4, d.setUint8(u, i.length), u += 1, f.set(i, u), u += i.length, d.setUint16(u, r.length, !0), u += 2, f.set(r, u), u += r.length, d.setUint32(u, c.length, !0), u += 4, f.set(c, u), u += c.length, o.length > 0 && f.set(o, u), h;
+  return d.setUint8(u, y.REQUEST), u += 1, d.setUint32(u, h, !0), u += 4, d.setUint8(u, i.length), u += 1, f.set(i, u), u += i.length, d.setUint16(u, r.length, !0), u += 2, f.set(r, u), u += r.length, d.setUint32(u, c.length, !0), u += 4, f.set(c, u), u += c.length, o.length > 0 && f.set(o, u), l;
 }
-function de(l, e, t = {}) {
-  const s = W.encode(JSON.stringify(t)), n = 11 + s.length, i = new ArrayBuffer(n), r = new DataView(i), c = new Uint8Array(i);
+function ye(h, e, t = {}) {
+  const s = $.encode(JSON.stringify(t)), n = 11 + s.length, i = new ArrayBuffer(n), r = new DataView(i), c = new Uint8Array(i);
   let o = 0;
-  return r.setUint8(o, y.RESPONSE), o += 1, r.setUint32(o, l, !0), o += 4, r.setUint16(o, e, !0), o += 2, r.setUint32(o, s.length, !0), o += 4, c.set(s, o), i;
+  return r.setUint8(o, y.RESPONSE), o += 1, r.setUint32(o, h, !0), o += 4, r.setUint16(o, e, !0), o += 2, r.setUint32(o, s.length, !0), o += 4, c.set(s, o), i;
 }
-function Y(l, e, t) {
+function X(h, e, t) {
   const s = new Uint8Array(t), n = new ArrayBuffer(9 + s.length), i = new DataView(n);
-  return new Uint8Array(n).set(s, 9), i.setUint8(0, y.BODY), i.setUint32(1, l, !0), i.setUint32(5, e, !0), n;
+  return new Uint8Array(n).set(s, 9), i.setUint8(0, y.BODY), i.setUint32(1, h, !0), i.setUint32(5, e, !0), n;
 }
-function ue(l, e = 0) {
+function Se(h, e = 0) {
   const t = new ArrayBuffer(9), s = new DataView(t);
-  return s.setUint8(0, y.END), s.setUint32(1, l, !0), s.setUint32(5, e, !0), t;
+  return s.setUint8(0, y.END), s.setUint32(1, h, !0), s.setUint32(5, e, !0), t;
 }
-function Q(l, e) {
-  const t = W.encode(e), s = new ArrayBuffer(5 + t.length), n = new DataView(s);
-  return new Uint8Array(s).set(t, 5), n.setUint8(0, y.ERROR), n.setUint32(1, l, !0), s;
+function Z(h, e) {
+  const t = $.encode(e), s = new ArrayBuffer(5 + t.length), n = new DataView(s);
+  return new Uint8Array(s).set(t, 5), n.setUint8(0, y.ERROR), n.setUint32(1, h, !0), s;
 }
-function we(l) {
-  const e = new DataView(l), t = new Uint8Array(l), s = e.getUint8(0), n = e.getUint32(1, !0);
+function Ae(h) {
+  const e = new DataView(h), t = new Uint8Array(h), s = e.getUint8(0), n = e.getUint32(1, !0);
   switch (s) {
     case y.REQUEST: {
       let i = 5;
       const r = e.getUint8(i);
       i += 1;
-      const c = B.decode(t.slice(i, i + r));
+      const c = W.decode(t.slice(i, i + r));
       i += r;
       const o = e.getUint16(i, !0);
       i += 2;
-      const a = B.decode(t.slice(i, i + o));
+      const a = W.decode(t.slice(i, i + o));
       i += o;
-      const h = e.getUint32(i, !0);
+      const l = e.getUint32(i, !0);
       i += 4;
-      const d = JSON.parse(B.decode(t.slice(i, i + h)));
-      i += h;
-      const f = i < l.byteLength ? l.slice(i) : null;
+      const d = JSON.parse(W.decode(t.slice(i, i + l)));
+      i += l;
+      const f = i < h.byteLength ? h.slice(i) : null;
       return { type: s, requestId: n, method: c, url: a, headers: d, body: f };
     }
     case y.RESPONSE: {
@@ -1060,27 +1202,27 @@ function we(l) {
       i += 2;
       const c = e.getUint32(i, !0);
       i += 4;
-      const o = JSON.parse(B.decode(t.slice(i, i + c)));
+      const o = JSON.parse(W.decode(t.slice(i, i + c)));
       return { type: s, requestId: n, status: r, headers: o };
     }
     case y.BODY: {
       const i = e.getUint32(5, !0);
-      return { type: s, requestId: n, seqNum: i, data: l.slice(9) };
+      return { type: s, requestId: n, seqNum: i, data: h.slice(9) };
     }
     case y.END:
-      return { type: s, requestId: n, seqCount: l.byteLength >= 9 ? e.getUint32(5, !0) : 0 };
+      return { type: s, requestId: n, seqCount: h.byteLength >= 9 ? e.getUint32(5, !0) : 0 };
     case y.ERROR:
-      return { type: s, requestId: n, message: B.decode(t.slice(5)) };
+      return { type: s, requestId: n, message: W.decode(t.slice(5)) };
     default:
       return { type: s, requestId: n };
   }
 }
-class He {
+class Ze {
   constructor(e) {
     this._map = {}, this._internal = /* @__PURE__ */ new Set();
     for (const [t, s] of Object.entries(e)) {
       const n = t.toLowerCase();
-      this._map[n] = s, n.startsWith("x-fastrtc-") && this._internal.add(n);
+      this._map[n] = s, n.startsWith("x-speedrtc-") && this._internal.add(n);
     }
   }
   get(e) {
@@ -1109,8 +1251,8 @@ class He {
 `) : [];
   }
 }
-let Fe = 1;
-class je {
+let et = 1;
+class tt {
   constructor() {
     this._cookies = [];
   }
@@ -1120,17 +1262,17 @@ class je {
     for (const r of s) {
       const c = r.split(";").map((_) => _.trim()), [o] = c, a = o.indexOf("=");
       if (a < 0) continue;
-      const h = o.slice(0, a).trim(), d = o.slice(a + 1).trim();
-      let f = n.hostname, u = "/", m = null, C = !1, U = n.protocol === "https:";
+      const l = o.slice(0, a).trim(), d = o.slice(a + 1).trim();
+      let f = n.hostname, u = "/", g = null, b = !1, M = n.protocol === "https:";
       for (let _ = 1; _ < c.length; _++) {
-        const [M, S = ""] = c[_].split("=").map((A) => A.trim()), p = M.toLowerCase();
-        p === "domain" ? f = S.replace(/^\./, "") : p === "path" ? u = S || "/" : p === "expires" ? m = new Date(S).getTime() : p === "max-age" ? m = i + parseInt(S, 10) * 1e3 : p === "httponly" ? C = !0 : p === "secure" && (U = !0);
+        const [P, S = ""] = c[_].split("=").map((A) => A.trim()), m = P.toLowerCase();
+        m === "domain" ? f = S.replace(/^\./, "") : m === "path" ? u = S || "/" : m === "expires" ? g = new Date(S).getTime() : m === "max-age" ? g = i + parseInt(S, 10) * 1e3 : m === "httponly" ? b = !0 : m === "secure" && (M = !0);
       }
-      if (m !== null && m < i) {
-        this._cookies = this._cookies.filter((_) => !(_.name === h && _.domain === f && _.path === u));
+      if (g !== null && g < i) {
+        this._cookies = this._cookies.filter((_) => !(_.name === l && _.domain === f && _.path === u));
         continue;
       }
-      const R = this._cookies.findIndex((_) => _.name === h && _.domain === f && _.path === u), T = { name: h, value: d, domain: f, path: u, expires: m, httpOnly: C, secure: U };
+      const R = this._cookies.findIndex((_) => _.name === l && _.domain === f && _.path === u), T = { name: l, value: d, domain: f, path: u, expires: g, httpOnly: b, secure: M };
       R >= 0 ? this._cookies[R] = T : this._cookies.push(T);
     }
   }
@@ -1160,12 +1302,12 @@ class je {
     }
   }
 }
-class ze {
+class st {
   constructor(e) {
-    this._send = e, this._pending = /* @__PURE__ */ new Map(), this.cookieJar = new je();
+    this._send = e, this._pending = /* @__PURE__ */ new Map(), this.cookieJar = new tt();
   }
   async fetch(e, t = {}) {
-    const s = Fe++, n = (t.method || "GET").toUpperCase(), i = Object.assign({}, t.headers || {});
+    const s = et++, n = (t.method || "GET").toUpperCase(), i = Object.assign({}, t.headers || {});
     let r = null;
     if (t.body) {
       if (typeof t.body == "string")
@@ -1182,48 +1324,48 @@ class ze {
         const a = new Request("/", { method: "POST", body: t.body });
         r = await a.arrayBuffer(), i["content-type"] || (i["content-type"] = a.headers.get("content-type"));
       } else if (typeof ReadableStream < "u" && t.body instanceof ReadableStream) {
-        const a = t.body.getReader(), h = [];
+        const a = t.body.getReader(), l = [];
         let d = 0;
         for (; ; ) {
-          const { done: m, value: C } = await a.read();
-          if (m) break;
-          h.push(C), d += C.byteLength;
+          const { done: g, value: b } = await a.read();
+          if (g) break;
+          l.push(b), d += b.byteLength;
         }
         const f = new Uint8Array(d);
         let u = 0;
-        for (const m of h)
-          f.set(m, u), u += m.byteLength;
+        for (const g of l)
+          f.set(g, u), u += g.byteLength;
         r = f.buffer;
       }
     }
     t.redirect && (i["x-proxy-opt-redirect"] = t.redirect), t.cache && (i["x-proxy-opt-cache"] = t.cache), t.mode && (i["x-proxy-opt-mode"] = t.mode), t.referrer && (i["x-proxy-opt-referrer"] = t.referrer), t.referrerPolicy && (i["x-proxy-opt-referrerpolicy"] = t.referrerPolicy), t.credentials && (i["x-proxy-opt-credentials"] = t.credentials);
     try {
-      const a = new URL(e).origin, h = this.cookieJar.get(e);
-      h && !i.cookie && (i.cookie = h);
+      const a = new URL(e).origin, l = this.cookieJar.get(e);
+      l && !i.cookie && (i.cookie = l);
     } catch {
     }
-    const c = t.timeout || 3e4, o = qe(s, n, e, i, r);
-    return new Promise((a, h) => {
+    const c = t.timeout || 3e4, o = Xe(s, n, e, i, r);
+    return new Promise((a, l) => {
       const d = t.signal;
       let f = !1;
       const u = setTimeout(() => {
-        f || (f = !0, this._pending.delete(s), h(new DOMException(`Proxy request timed out: ${n} ${e}`, "TimeoutError")));
-      }, c), m = () => {
-        f || (f = !0, clearTimeout(u), this._pending.delete(s), h(d.reason || new DOMException("The operation was aborted.", "AbortError")));
+        f || (f = !0, this._pending.delete(s), l(new DOMException(`Proxy request timed out: ${n} ${e}`, "TimeoutError")));
+      }, c), g = () => {
+        f || (f = !0, clearTimeout(u), this._pending.delete(s), l(d.reason || new DOMException("The operation was aborted.", "AbortError")));
       };
       if (d) {
         if (d.aborted) {
-          m();
+          g();
           return;
         }
-        d.addEventListener("abort", m, { once: !0 });
+        d.addEventListener("abort", g, { once: !0 });
       }
       this._pending.set(s, {
-        resolve: (C) => {
-          d && d.removeEventListener("abort", m), a(C);
+        resolve: (b) => {
+          d && d.removeEventListener("abort", g), a(b);
         },
-        reject: (C) => {
-          d && d.removeEventListener("abort", m), h(C);
+        reject: (b) => {
+          d && d.removeEventListener("abort", g), l(b);
         },
         timeout: u,
         url: e,
@@ -1233,11 +1375,11 @@ class ze {
         totalBodySize: 0,
         seqCount: -1,
         endReceived: !1
-      }), this._send(o).catch(h);
+      }), this._send(o).catch(l);
     });
   }
   handleIncoming(e) {
-    const t = we(e), s = this._pending.get(t.requestId);
+    const t = Ae(e), s = this._pending.get(t.requestId);
     if (s)
       switch (t.type) {
         case y.RESPONSE:
@@ -1260,7 +1402,7 @@ class ze {
     let n = 0;
     for (const o of t.bodyChunks)
       s.set(o.data, n), n += o.data.length;
-    const i = new He(t.headers), r = i.get("x-fastrtc-compressed") === "gzip", c = i.get("x-fastrtc-set-cookie");
+    const i = new Ze(t.headers), r = i.get("x-speedrtc-compressed") === "gzip", c = i.get("x-speedrtc-set-cookie");
     if (c)
       try {
         const o = JSON.parse(c);
@@ -1291,9 +1433,9 @@ class ze {
         c.push(f), o += f.byteLength;
       }
       const a = new Uint8Array(o);
-      let h = 0;
+      let l = 0;
       for (const d of c)
-        a.set(d, h), h += d.byteLength;
+        a.set(d, l), l += d.byteLength;
       t.resolve(new O(t.status, s, a.buffer));
     } catch {
       t.resolve(new O(t.status, s, e));
@@ -1302,7 +1444,7 @@ class ze {
 }
 class O {
   constructor(e, t, s) {
-    this.status = e, this.statusText = t.get("x-fastrtc-status-text") || "", this.url = t.get("x-fastrtc-url") || "", this.redirected = t.get("x-fastrtc-redirected") === "1", this.ok = e >= 200 && e < 300, this.type = "basic", this.headers = t, this._body = s, this.bodyUsed = !1, this.body = typeof ReadableStream < "u" ? new ReadableStream({
+    this.status = e, this.statusText = t.get("x-speedrtc-status-text") || "", this.url = t.get("x-speedrtc-url") || "", this.redirected = t.get("x-speedrtc-redirected") === "1", this.ok = e >= 200 && e < 300, this.type = "basic", this.headers = t, this._body = s, this.bodyUsed = !1, this.body = typeof ReadableStream < "u" ? new ReadableStream({
       start(n) {
         n.enqueue(new Uint8Array(s)), n.close();
       }
@@ -1334,7 +1476,7 @@ class O {
     return new O(this.status, this.headers, this._body.slice(0));
   }
 }
-const Ge = 16 * 1024, $ = /* @__PURE__ */ new Map(), Ke = 200, Je = /* @__PURE__ */ new Set([200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501]), Ve = /* @__PURE__ */ new Set([
+const nt = 16 * 1024, B = /* @__PURE__ */ new Map(), it = 200, rt = /* @__PURE__ */ new Set([200, 203, 204, 206, 300, 301, 404, 405, 410, 414, 501]), ot = /* @__PURE__ */ new Set([
   "content-encoding",
   "transfer-encoding",
   "content-length",
@@ -1345,11 +1487,11 @@ const Ge = 16 * 1024, $ = /* @__PURE__ */ new Map(), Ke = 200, Je = /* @__PURE__
   "proxy-authorization",
   "te",
   "trailer"
-]), Ye = /* @__PURE__ */ new Set([
+]), at = /* @__PURE__ */ new Set([
   "host",
   "origin",
   "referer"
-]), Qe = /* @__PURE__ */ new Set([
+]), ct = /* @__PURE__ */ new Set([
   "content-security-policy",
   "content-security-policy-report-only",
   "x-frame-options",
@@ -1365,9 +1507,9 @@ const Ge = 16 * 1024, $ = /* @__PURE__ */ new Map(), Ke = 200, Je = /* @__PURE__
   "access-control-max-age",
   "strict-transport-security"
 ]);
-class Xe {
+class ht {
   constructor(e, t = {}) {
-    this._send = e, this._allowList = t.allowList || [], this._blockList = t.blockList || [], this._chunkSize = t.chunkSize || Ge, this._compress = t.compress || !1, this._active = !1;
+    this._send = e, this._allowList = t.allowList || [], this._blockList = t.blockList || [], this._chunkSize = t.chunkSize || nt, this._compress = t.compress || !1, this._active = !1;
   }
   serve(e) {
     e && (e.chunkSize != null && (this._chunkSize = e.chunkSize), e.compress != null && (this._compress = e.compress), e.allowList != null && (this._allowList = e.allowList), e.blockList != null && (this._blockList = e.blockList)), this._active = !0;
@@ -1376,109 +1518,109 @@ class Xe {
     this._active = !1;
   }
   async handleIncoming(e) {
-    const t = we(e);
+    const t = Ae(e);
     if (t.type !== y.REQUEST) return;
     if (!this._active) {
-      await this._send(Q(t.requestId, "Proxy server not active"));
+      await this._send(Z(t.requestId, "Proxy server not active"));
       return;
     }
     const { requestId: s, method: n, url: i, headers: r, body: c } = t;
     let o = 0;
     if (!this._isDomainAllowed(i)) {
-      await this._send(Q(s, "Domain not allowed"));
+      await this._send(Z(s, "Domain not allowed"));
       return;
     }
     try {
-      const a = {}, h = {};
+      const a = {}, l = {};
       for (const [w, I] of Object.entries(r))
-        w.startsWith("x-proxy-opt-") ? h[w.slice(12)] = I : a[w] = I;
+        w.startsWith("x-proxy-opt-") ? l[w.slice(12)] = I : a[w] = I;
       const d = { method: n, headers: a };
-      c && n !== "GET" && n !== "HEAD" && (d.body = c), h.redirect && (d.redirect = h.redirect), h.cache && (d.cache = h.cache), h.mode && (d.mode = h.mode), h.referrer && (d.referrer = h.referrer), h.referrerpolicy && (d.referrerPolicy = h.referrerpolicy), h.credentials && (d.credentials = h.credentials);
-      const f = new URL(i), u = f.origin, m = f.host, C = a.origin || "";
-      let U;
+      c && n !== "GET" && n !== "HEAD" && (d.body = c), l.redirect && (d.redirect = l.redirect), l.cache && (d.cache = l.cache), l.mode && (d.mode = l.mode), l.referrer && (d.referrer = l.referrer), l.referrerpolicy && (d.referrerPolicy = l.referrerpolicy), l.credentials && (d.credentials = l.credentials);
+      const f = new URL(i), u = f.origin, g = f.host, b = a.origin || "";
+      let M;
       try {
-        const w = new URL(C);
-        U = w.origin === u ? "same-origin" : w.hostname.endsWith("." + m) || m.endsWith("." + w.hostname) ? "same-site" : "cross-site";
+        const w = new URL(b);
+        M = w.origin === u ? "same-origin" : w.hostname.endsWith("." + g) || g.endsWith("." + w.hostname) ? "same-site" : "cross-site";
       } catch {
-        U = "none";
+        M = "none";
       }
       const R = (a.accept || "").toLowerCase();
       let T, _;
       R.includes("text/html") ? (T = "document", _ = "navigate") : R.includes("application/json") || R.startsWith("*/*") ? (T = "empty", _ = "cors") : R.includes("image/") ? (T = "image", _ = "no-cors") : R.includes("text/css") ? (T = "style", _ = "cors") : R.includes("application/javascript") || R.includes("text/javascript") ? (T = "script", _ = "no-cors") : R.includes("font/") ? (T = "font", _ = "cors") : (T = "empty", _ = "cors");
-      for (const w of Ye) delete a[w];
-      a.host = m, a.origin || (a.origin = u), a.referer || (a.referer = f.href), a["user-agent"] || (a["user-agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"), a.accept || (a.accept = "*/*"), a["accept-language"] || (a["accept-language"] = "en-US,en;q=0.9"), a["accept-encoding"] = "identity", a["sec-fetch-site"] = U, a["sec-fetch-mode"] = _, a["sec-fetch-dest"] = T, a["sec-ch-ua"] = '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"', a["sec-ch-ua-mobile"] = "?0", a["sec-ch-ua-platform"] = '"Windows"', c && (a["content-length"] = String(c.byteLength || 0));
-      const M = n === "GET" || n === "HEAD" ? `${n}:${i}` : null, S = M ? $.get(M) : null;
+      for (const w of at) delete a[w];
+      a.host = g, a.origin || (a.origin = u), a.referer || (a.referer = f.href), a["user-agent"] || (a["user-agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"), a.accept || (a.accept = "*/*"), a["accept-language"] || (a["accept-language"] = "en-US,en;q=0.9"), a["accept-encoding"] = "identity", a["sec-fetch-site"] = M, a["sec-fetch-mode"] = _, a["sec-fetch-dest"] = T, a["sec-ch-ua"] = '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"', a["sec-ch-ua-mobile"] = "?0", a["sec-ch-ua-platform"] = '"Windows"', c && (a["content-length"] = String(c.byteLength || 0));
+      const P = n === "GET" || n === "HEAD" ? `${n}:${i}` : null, S = P ? B.get(P) : null;
       if (S) {
         const w = a["if-none-match"], I = a["if-modified-since"];
         if (w && w === S.etag || I && S.lastModified && new Date(I) >= new Date(S.lastModified)) {
-          await this._send(de(s, 304, { etag: S.etag || "", "last-modified": S.lastModified || "" })), await this._send(ue(s));
+          await this._send(ye(s, 304, { etag: S.etag || "", "last-modified": S.lastModified || "" })), await this._send(Se(s));
           return;
         }
         S.etag && (a["if-none-match"] = S.etag), S.lastModified && (a["if-modified-since"] = S.lastModified);
       }
-      const p = await fetch(i, d), A = {}, J = [];
-      p.headers.forEach((w, I) => {
-        const D = I.toLowerCase();
-        if (!Ve.has(D) && !Qe.has(D)) {
-          if (D === "set-cookie") {
-            J.push(w);
+      const m = await fetch(i, d), A = {}, V = [];
+      m.headers.forEach((w, I) => {
+        const N = I.toLowerCase();
+        if (!ot.has(N) && !ct.has(N)) {
+          if (N === "set-cookie") {
+            V.push(w);
             return;
           }
           A[I] = w;
         }
-      }), J.length > 0 && (A["x-fastrtc-set-cookie"] = JSON.stringify(J));
-      const te = p.headers.get("etag"), se = p.headers.get("last-modified"), ne = p.headers.get("cache-control") || "", be = ne.includes("no-store") || ne.includes("no-cache");
-      if (M && !be && Je.has(p.status) && (te || se) && ($.size >= Ke && $.delete($.keys().next().value), $.set(M, { etag: te, lastModified: se })), A["x-fastrtc-status-text"] = p.statusText, A["x-fastrtc-url"] = p.url, p.redirected && (A["x-fastrtc-redirected"] = "1"), this._compress && (A["x-fastrtc-compressed"] = "gzip"), await this._send(de(s, p.status, A)), p.body) {
-        const I = (p.headers.get("content-type") || "").toLowerCase().includes("text/css"), D = p.url || i;
-        let q = p.body;
+      }), V.length > 0 && (A["x-speedrtc-set-cookie"] = JSON.stringify(V));
+      const re = m.headers.get("etag"), oe = m.headers.get("last-modified"), ae = m.headers.get("cache-control") || "", Pe = ae.includes("no-store") || ae.includes("no-cache");
+      if (P && !Pe && rt.has(m.status) && (re || oe) && (B.size >= it && B.delete(B.keys().next().value), B.set(P, { etag: re, lastModified: oe })), A["x-speedrtc-status-text"] = m.statusText, A["x-speedrtc-url"] = m.url, m.redirected && (A["x-speedrtc-redirected"] = "1"), this._compress && (A["x-speedrtc-compressed"] = "gzip"), await this._send(ye(s, m.status, A)), m.body) {
+        const I = (m.headers.get("content-type") || "").toLowerCase().includes("text/css"), N = m.url || i;
+        let H = m.body;
         if (I) {
-          const H = await new Response(q).arrayBuffer(), F = this._rewriteCssUrls(new TextDecoder().decode(H), D), v = new TextEncoder().encode(F), P = this._chunkSize;
+          const F = await new Response(H).arrayBuffer(), j = this._rewriteCssUrls(new TextDecoder().decode(F), N), U = new TextEncoder().encode(j), v = this._chunkSize;
           let x = 0;
           if (this._compress && typeof CompressionStream < "u") {
-            const b = new CompressionStream("gzip"), j = b.writable.getWriter();
-            j.write(v), j.close();
-            const ie = b.readable.getReader();
+            const C = new CompressionStream("gzip"), z = C.writable.getWriter();
+            z.write(U), z.close();
+            const ce = C.readable.getReader();
             try {
               for (; ; ) {
-                const { done: ke, value: N } = await ie.read();
-                if (ke) break;
-                if (N != null && N.length)
-                  for (let z = 0; z < N.length; z += P)
-                    await this._send(Y(s, x++, N.subarray(z, z + P)));
+                const { done: Ue, value: D } = await ce.read();
+                if (Ue) break;
+                if (D != null && D.length)
+                  for (let G = 0; G < D.length; G += v)
+                    await this._send(X(s, x++, D.subarray(G, G + v)));
               }
             } finally {
-              ie.cancel().catch(() => {
+              ce.cancel().catch(() => {
               });
             }
           } else
-            for (let b = 0; b < v.length; b += P)
-              await this._send(Y(s, x++, v.subarray(b, b + P)));
+            for (let C = 0; C < U.length; C += v)
+              await this._send(X(s, x++, U.subarray(C, C + v)));
           o = x;
         } else {
-          this._compress && typeof CompressionStream < "u" && (q = q.pipeThrough(new CompressionStream("gzip")));
-          const H = q.getReader();
-          let F = 0;
-          const v = this._chunkSize;
+          this._compress && typeof CompressionStream < "u" && (H = H.pipeThrough(new CompressionStream("gzip")));
+          const F = H.getReader();
+          let j = 0;
+          const U = this._chunkSize;
           try {
             for (; ; ) {
-              const { done: P, value: x } = await H.read();
-              if (P) break;
+              const { done: v, value: x } = await F.read();
+              if (v) break;
               if (x != null && x.length)
-                for (let b = 0; b < x.length; b += v) {
-                  const j = x.subarray(b, b + v);
-                  await this._send(Y(s, F++, j));
+                for (let C = 0; C < x.length; C += U) {
+                  const z = x.subarray(C, C + U);
+                  await this._send(X(s, j++, z));
                 }
             }
           } finally {
-            H.cancel().catch(() => {
+            F.cancel().catch(() => {
             });
           }
-          o = F;
+          o = j;
         }
       }
-      await this._send(ue(s, o));
+      await this._send(Se(s, o));
     } catch (a) {
-      await this._send(Q(s, a.message || "Proxy fetch failed"));
+      await this._send(Z(s, a.message || "Proxy fetch failed"));
     }
   }
   _rewriteCssUrls(e, t) {
@@ -1533,7 +1675,7 @@ class Xe {
     ).test(e);
   }
 }
-class Ze {
+class lt {
   constructor(e, t) {
     this.pc = e, this._renegotiate = t, this.localStream = null, this.remoteStream = null, this._senders = [], this._listeners = {}, this.pc.ontrack = (s) => {
       this.remoteStream || (this.remoteStream = new MediaStream()), this.remoteStream.addTrack(s.track), this._emit("remoteStream", this.remoteStream), this._emit("track", s.track, s.streams);
@@ -1591,8 +1733,8 @@ class Ze {
     this._renegotiate();
   }
 }
-const fe = 1, ye = 2, Se = 3, Z = new TextEncoder(), X = new TextDecoder();
-class et {
+const Ce = 1, xe = 2, Ee = 3, ne = new TextEncoder(), ee = new TextDecoder();
+class dt {
   constructor(e) {
     this._send = e, this._streams = /* @__PURE__ */ new Map(), this._listeners = {};
   }
@@ -1612,33 +1754,33 @@ class et {
         }
   }
   create(e) {
-    const t = new _e(e, this._send);
+    const t = new ke(e, this._send);
     this._streams.set(e, t);
-    const s = Z.encode(e), n = new ArrayBuffer(2 + s.length), i = new Uint8Array(n);
-    return i[0] = fe, i[1] = s.length, i.set(s, 2), this._send(n), t;
+    const s = ne.encode(e), n = new ArrayBuffer(2 + s.length), i = new Uint8Array(n);
+    return i[0] = Ce, i[1] = s.length, i.set(s, 2), this._send(n), t;
   }
   get(e) {
     return this._streams.get(e);
   }
   handleIncoming(e) {
     const t = new Uint8Array(e), s = t[0];
-    if (s === fe) {
-      const n = t[1], i = X.decode(t.slice(2, 2 + n)), r = new _e(i, this._send);
+    if (s === Ce) {
+      const n = t[1], i = ee.decode(t.slice(2, 2 + n)), r = new ke(i, this._send);
       this._streams.set(i, r), this._emit("incoming", r);
       return;
     }
-    if (s === ye) {
-      const n = t[1], i = X.decode(t.slice(2, 2 + n)), r = e.slice(2 + n), c = this._streams.get(i);
+    if (s === xe) {
+      const n = t[1], i = ee.decode(t.slice(2, 2 + n)), r = e.slice(2 + n), c = this._streams.get(i);
       c && c._handleData(r);
       return;
     }
-    if (s === Se) {
-      const n = t[1], i = X.decode(t.slice(2, 2 + n)), r = this._streams.get(i);
+    if (s === Ee) {
+      const n = t[1], i = ee.decode(t.slice(2, 2 + n)), r = this._streams.get(i);
       r && (r._handleClose(), this._streams.delete(i));
     }
   }
 }
-class _e {
+class ke {
   constructor(e, t) {
     this.name = e, this._send = t, this._listeners = {}, this._closed = !1;
   }
@@ -1658,14 +1800,14 @@ class _e {
   }
   async write(e) {
     if (this._closed) throw new Error("Stream closed");
-    const t = new Uint8Array(e), s = Z.encode(this.name), n = new ArrayBuffer(2 + s.length + t.length), i = new Uint8Array(n);
-    i[0] = ye, i[1] = s.length, i.set(s, 2), i.set(t, 2 + s.length), await this._send(n);
+    const t = new Uint8Array(e), s = ne.encode(this.name), n = new ArrayBuffer(2 + s.length + t.length), i = new Uint8Array(n);
+    i[0] = xe, i[1] = s.length, i.set(s, 2), i.set(t, 2 + s.length), await this._send(n);
   }
   async close() {
     if (this._closed) return;
     this._closed = !0;
-    const e = Z.encode(this.name), t = new ArrayBuffer(2 + e.length), s = new Uint8Array(t);
-    s[0] = Se, s[1] = e.length, s.set(e, 2), await this._send(t), this._emit("close");
+    const e = ne.encode(this.name), t = new ArrayBuffer(2 + e.length), s = new Uint8Array(t);
+    s[0] = Ee, s[1] = e.length, s.set(e, 2), await this._send(t), this._emit("close");
   }
   _handleData(e) {
     this._emit("data", e);
@@ -1679,7 +1821,7 @@ const k = {
   MESSAGE: 241,
   PROXY: 242,
   STREAM: 243
-}, tt = [
+}, ut = [
   { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
   { urls: "stun:stun.cloudflare.com:3478" },
   {
@@ -1693,29 +1835,43 @@ const k = {
     credential: "openrelayproject"
   }
 ];
-let pe = 1;
-function E(l, e) {
-  const t = new Uint8Array(e), s = new ArrayBuffer(1 + t.length), n = new Uint8Array(s);
-  return n[0] = l, n.set(t, 1), s;
+let be = 1, q = null, te = null;
+function Me() {
+  return q ? Promise.resolve(q) : (te || (te = RTCPeerConnection.generateCertificate({ name: "ECDSA", namedCurve: "P-256" }).then((h) => (q = h, h)).catch(() => null)), te);
 }
-class st {
+Me();
+function E(h, e) {
+  const t = new Uint8Array(e), s = new ArrayBuffer(1 + t.length), n = new Uint8Array(s);
+  return n[0] = h, n.set(t, 1), s;
+}
+class _t {
   constructor({
-    iceServers: e = tt,
+    iceServers: e = ut,
     dataChannels: t = 32,
-    chunkSize: s = ge,
+    chunkSize: s = Ie,
     proxy: n = {},
     isHost: i = !1,
     requireRoomCode: r = !1,
     trackerUrls: c = null,
     driveSignal: o = null,
     serverMode: a = !1,
-    iceTransportPolicy: h = "all",
-    iceCandidatePoolSize: d = 10
+    iceTransportPolicy: l = "all",
+    iceCandidatePoolSize: d = 10,
+    signalServer: f = null
   } = {}) {
-    this.iceServers = e, this.iceTransportPolicy = h, this.iceCandidatePoolSize = d, this.dataChannelCount = t, this.chunkSize = s, this.isHost = i, this.requireRoomCode = r, this.trackerUrls = c, this.driveSignalConfig = o, this.serverMode = a, this.remoteIsHost = !1, this.pc = null, this.signaling = null, this.pool = null, this.bonding = null, this.monitor = new me(), this.roomCode = null, this.isOfferer = !1, this._listeners = {}, this._pendingMeta = /* @__PURE__ */ new Map(), this._probeTimers = /* @__PURE__ */ new Map(), this._negotiationState = "idle", this._pcCreated = !1, this._iceRestartPending = !1, this._proxyOpts = n, this.message = null, this._proxyClient = null, this._proxyServer = null, this.proxy = null, this.media = null, this.stream = null;
+    this.iceServers = e, this.iceTransportPolicy = l, this.iceCandidatePoolSize = d, this.dataChannelCount = t, this.chunkSize = s, this.isHost = i, this.requireRoomCode = r, this.trackerUrls = c, this.driveSignalConfig = o, this.signalServerUrl = f, this.serverMode = a, this.remoteIsHost = !1, this.pc = null, this.signaling = null, this.pool = null, this.bonding = null, this.monitor = new Te(), this.roomCode = null, this.isOfferer = !1, this._listeners = {}, this._pendingMeta = /* @__PURE__ */ new Map(), this._probeTimers = /* @__PURE__ */ new Map(), this._negotiationState = "idle", this._pcCreated = !1, this._iceRestartPending = !1, this._pendingIceCandidates = [], this._pendingRemoteCandidates = [], this._preConnectedWs = null, this._preWarmedManager = null, this._proxyOpts = n, this.message = null, this._proxyClient = null, this._proxyServer = null, this.proxy = null, this.media = null, this.stream = null;
   }
   warmup() {
-    this._pcCreated || this._createPeerConnection();
+    var e;
+    if (Me(), this._pcCreated || this._createPeerConnection(), this.driveSignalConfig && p.warmupToken(this.driveSignalConfig).catch(() => {
+    }), this.signalServerUrl && !this._preConnectedWs && pe.preConnect(this.signalServerUrl).then((t) => {
+      this._preConnectedWs = t;
+    }).catch(() => {
+    }), !this.driveSignalConfig && !this.signalServerUrl && !this._preWarmedManager) {
+      const t = (e = this.trackerUrls) != null && e.length ? [...this.trackerUrls] : se.DEFAULT_TRACKER_URLS;
+      this._preWarmedManager = new Re(t), this._preWarmedConnectPromise = this._preWarmedManager.connect().catch(() => {
+      });
+    }
   }
   getVersion() {
     return "0.0.2";
@@ -1732,13 +1888,23 @@ class st {
         try {
           s(...t);
         } catch (n) {
-          console.error("FastRTC event error:", n);
+          console.error("SpeedRTC event error:", n);
         }
   }
   async createRoom(e = null) {
-    return this.isOfferer = !0, e ? this.roomCode = e : this.requireRoomCode ? this.roomCode = Math.random().toString(36).substring(2, 8).toUpperCase() : this.roomCode = "FASTRTC-PUBLIC-SWARM", new Promise((t, s) => {
+    if (this.isOfferer = !0, e ? this.roomCode = e : this.requireRoomCode ? this.roomCode = Math.random().toString(36).substring(2, 8).toUpperCase() : this.roomCode = "SPEEDRTC-PUBLIC-SWARM", this._pcCreated || this._createPeerConnection(), !this.driveSignalConfig) {
+      this._negotiationState = "offering";
+      const t = await this.pc.createOffer();
+      await this.pc.setLocalDescription(t);
+    }
+    return this._preWarmedConnectPromise && (await this._preWarmedConnectPromise, this._preWarmedConnectPromise = null), new Promise((t, s) => {
       this.signaling = this._createSignaling(!0), this.signaling.onOpen = () => {
-        this._pcCreated || this._createPeerConnection(), this._emit("wss-open", 0), this._emit("room-created", this.roomCode), t(this.roomCode);
+        this._emit("wss-open", 0), this._emit("room-created", this.roomCode), this.driveSignalConfig || this.signaling.send({
+          type: "offer",
+          sdp: this.pc.localDescription,
+          roomCode: this.roomCode,
+          isHost: this.isHost
+        }), t(this.roomCode);
       }, this.signaling.onMessage = (n) => {
         this._onSignalingMessage(n);
       }, this.signaling.onClose = () => {
@@ -1751,12 +1917,12 @@ class st {
       this.roomCode = e;
     else {
       if (this.requireRoomCode)
-        return Promise.reject(new Error("FastRTC is configured with requireRoomCode=true, but no code was provided to joinRoom()."));
-      this.roomCode = "FASTRTC-PUBLIC-SWARM";
+        return Promise.reject(new Error("SpeedRTC is configured with requireRoomCode=true, but no code was provided to joinRoom()."));
+      this.roomCode = "SPEEDRTC-PUBLIC-SWARM";
     }
-    return new Promise((t, s) => {
+    return this._pcCreated || this._createPeerConnection(), this._preWarmedConnectPromise && (await this._preWarmedConnectPromise, this._preWarmedConnectPromise = null), new Promise((t, s) => {
       this._joinResolver = t, this.signaling = this._createSignaling(!1), this.signaling.onOpen = () => {
-        this._pcCreated || this._createPeerConnection(), this._emit("wss-open", 0);
+        this._emit("wss-open", 0);
       }, this.signaling.onMessage = (n) => {
         this._onSignalingMessage(n);
       }, this.signaling.onClose = () => {
@@ -1766,19 +1932,19 @@ class st {
   }
   async send(e) {
     if (!this.bonding) throw new Error("Not connected");
-    const t = pe++, n = ce(e, t, this.chunkSize).map((i) => E(k.CHUNK, i));
+    const t = be++, n = me(e, t, this.chunkSize).map((i) => E(k.CHUNK, i));
     await this.bonding.sendChunks(n);
   }
   async sendFile(e) {
     if (!this.bonding) throw new Error("Not connected");
-    const t = pe++, s = await e.arrayBuffer(), n = { name: e.name, size: e.size, type: e.type }, i = E(k.CHUNK, Oe(t, n));
+    const t = be++, s = await e.arrayBuffer(), n = { name: e.name, size: e.size, type: e.type }, i = E(k.CHUNK, ze(t, n));
     for (const o of this.bonding.senders)
       try {
         await o(i);
       } catch {
       }
     await new Promise((o) => setTimeout(o, 50));
-    const r = ce(s, t, this.chunkSize), c = r.map((o) => E(k.CHUNK, o));
+    const r = me(s, t, this.chunkSize), c = r.map((o) => E(k.CHUNK, o));
     this._emit("send-start", { transferId: t, name: e.name, totalChunks: r.length }), await this.bonding.sendChunks(c), this._emit("send-complete", { transferId: t, name: e.name });
   }
   getStats() {
@@ -1797,19 +1963,39 @@ class st {
   disconnect() {
     this.monitor.stop();
     for (const e of this._probeTimers.values()) clearInterval(e);
-    this._probeTimers.clear(), this.media && this.media.stop(), this.pool && this.pool.close(), this.pc && this.pc.close(), this.signaling && this.signaling.close(), this.pc = null, this.pool = null, this.bonding = null, this.signaling = null, this.message = null, this.proxy = null, this.media = null, this.stream = null;
+    if (this._probeTimers.clear(), this.media && this.media.stop(), this.pool && this.pool.close(), this.pc && this.pc.close(), this.signaling && this.signaling.close(), this._preConnectedWs) {
+      try {
+        this._preConnectedWs.close();
+      } catch {
+      }
+      this._preConnectedWs = null;
+    }
+    this._preWarmedManager && (this._preWarmedManager.close(), this._preWarmedManager = null), this.pc = null, this.pool = null, this.bonding = null, this.signaling = null, this.message = null, this.proxy = null, this.media = null, this.stream = null;
   }
   _createSignaling(e) {
-    return this.driveSignalConfig ? new g(this.roomCode, e, this.driveSignalConfig) : new Ue(this.roomCode, e, this.trackerUrls);
+    if (this.driveSignalConfig)
+      return new p(this.roomCode, e, this.driveSignalConfig);
+    if (this.signalServerUrl) {
+      const s = new pe(this.roomCode, e, this.signalServerUrl);
+      return this._preConnectedWs && (s.usePreConnectedSocket(this._preConnectedWs), this._preConnectedWs = null), s;
+    }
+    const t = new se(this.roomCode, e, this.trackerUrls);
+    return this._preWarmedManager && (t.useManager(this._preWarmedManager), this._preWarmedManager = null), t;
   }
   _isSignalingReady() {
     return this.signaling ? this.signaling.connected !== void 0 ? this.signaling.connected : this.signaling.sockets ? this.signaling.sockets.some((e) => e.readyState === WebSocket.OPEN) : !1 : !1;
   }
   _onSignalingMessage(e) {
+    var t;
     if (e)
       switch (e.isHost === !0 && (this.remoteIsHost = !0), e.type) {
         case "peer-joined":
-          this.isOfferer && this._negotiationState === "idle" ? (this._negotiationState = "offering", this._emit("peer-joined"), this._createPeerConnection(), this._startOffer()) : !this.isOfferer && !this._pcCreated && this._emit("peer-joined");
+          this.isOfferer ? (this._emit("peer-joined"), this._flushPendingCandidates(), this._negotiationState === "idle" ? (this._negotiationState = "offering", this._createPeerConnection(), this._startOffer()) : this._negotiationState === "offering" && ((t = this.pc) != null && t.localDescription) && this.signaling.send({
+            type: "offer",
+            sdp: this.pc.localDescription,
+            roomCode: this.roomCode,
+            isHost: this.isHost
+          })) : !this.isOfferer && !this._pcCreated && this._emit("peer-joined");
           break;
         case "offer":
           !this.isOfferer && this._negotiationState !== "answering" && this._negotiationState !== "connected" && (this._negotiationState = "answering", this._pcCreated || this._createPeerConnection(), this._handleOffer(e.sdp));
@@ -1823,34 +2009,40 @@ class st {
       }
   }
   _createPeerConnection() {
-    this._pcCreated || (this._pcCreated = !0, this.pc = new RTCPeerConnection({
+    if (this._pcCreated) return;
+    this._pcCreated = !0;
+    const e = {
       iceServers: this.iceServers,
       iceTransportPolicy: this.iceTransportPolicy,
       iceCandidatePoolSize: this.iceCandidatePoolSize,
       bundlePolicy: "max-bundle",
       rtcpMuxPolicy: "require"
-    }), this.pc.onicecandidate = (e) => {
-      this.driveSignalConfig || e.candidate && this._isSignalingReady() && this.signaling.send({
+    };
+    q && (e.certificates = [q]), this.pc = new RTCPeerConnection(e), this.pc.onicecandidate = (t) => {
+      var n;
+      if (this.driveSignalConfig || !t.candidate || !this._isSignalingReady()) return;
+      const s = {
         type: "ice-candidate",
-        candidate: e.candidate,
+        candidate: t.candidate,
         roomCode: this.roomCode
-      });
+      };
+      (n = this.signaling) != null && n.remotePeerId ? this.signaling.send(s) : this._pendingIceCandidates.push(s);
     }, this.pc.onconnectionstatechange = () => {
       if (!this.pc) return;
-      const e = this.pc.connectionState;
-      this._emit("connection-state", e), e === "connected" ? (this._iceRestartPending = !1, this._onPeerConnected()) : (e === "disconnected" || e === "failed") && (e === "failed" && !this._iceRestartPending ? (this._iceRestartPending = !0, this._restartIce()) : this._emit("disconnected"));
+      const t = this.pc.connectionState;
+      this._emit("connection-state", t), t === "connected" ? (this._iceRestartPending = !1, this._onPeerConnected()) : (t === "disconnected" || t === "failed") && (t === "failed" && !this._iceRestartPending ? (this._iceRestartPending = !0, this._restartIce()) : this._emit("disconnected"));
     }, this.pc.oniceconnectionstatechange = () => {
       this.pc && this._emit("ice-state", this.pc.iceConnectionState);
-    }, this.pool = new Ce(this.pc, {
+    }, this.pool = new Le(this.pc, {
       channelCount: this.dataChannelCount,
       ordered: this.serverMode
-    }), this.pool.onOpen((e) => {
-      this._emit("channel-open", e), this._updateBondingPaths();
-    }), this.pool.onClose((e) => {
-      this._emit("channel-close", e);
-    }), this.pool.onMessage((e, t) => {
-      this._routeIncoming(t, `dc-${e}`);
-    }), this.pool.createChannels(), this.media = new Ze(this.pc, () => this._renegotiate()));
+    }), this.pool.onOpen((t) => {
+      this._emit("channel-open", t), this._updateBondingPaths();
+    }), this.pool.onClose((t) => {
+      this._emit("channel-close", t);
+    }), this.pool.onMessage((t, s) => {
+      this._routeIncoming(s, `dc-${t}`);
+    }), this.pool.createChannels(), this.media = new lt(this.pc, () => this._renegotiate());
   }
   async _startOffer() {
     const e = await this.pc.createOffer();
@@ -1862,17 +2054,17 @@ class st {
     });
   }
   async _handleOffer(e) {
-    await this.pc.setRemoteDescription(new RTCSessionDescription(e));
+    await this.pc.setRemoteDescription(new RTCSessionDescription(e)), this._flushRemoteCandidates();
     const t = await this.pc.createAnswer();
     await this.pc.setLocalDescription(t), this.driveSignalConfig && await this._waitForIceGathering(), this.signaling.send({
       type: "answer",
       sdp: this.pc.localDescription,
       roomCode: this.roomCode,
       isHost: this.isHost
-    }), this._joinResolver && (this._joinResolver(), this._joinResolver = null);
+    }), this._emit("peer-joined"), this._joinResolver && (this._joinResolver(), this._joinResolver = null);
   }
   async _handleAnswer(e) {
-    await this.pc.setRemoteDescription(new RTCSessionDescription(e));
+    await this.pc.setRemoteDescription(new RTCSessionDescription(e)), this._flushPendingCandidates(), this._flushRemoteCandidates();
   }
   _waitForIceGathering() {
     return !this.pc || this.pc.iceGatheringState === "complete" ? Promise.resolve() : new Promise((e) => {
@@ -1883,11 +2075,27 @@ class st {
     });
   }
   async _handleIceCandidate(e) {
-    if (this.pc && e)
+    if (!(!this.pc || !e)) {
+      if (!this.pc.remoteDescription) {
+        this._pendingRemoteCandidates.push(e);
+        return;
+      }
       try {
         await this.pc.addIceCandidate(new RTCIceCandidate(e));
       } catch {
       }
+    }
+  }
+  _flushPendingCandidates() {
+    for (const e of this._pendingIceCandidates)
+      this._isSignalingReady() && this.signaling.send(e);
+    this._pendingIceCandidates = [];
+  }
+  _flushRemoteCandidates() {
+    for (const e of this._pendingRemoteCandidates)
+      this.pc.addIceCandidate(new RTCIceCandidate(e)).catch(() => {
+      });
+    this._pendingRemoteCandidates = [];
   }
   async _renegotiate() {
     if (!this.pc || !this._isSignalingReady()) return;
@@ -1927,15 +2135,15 @@ class st {
     } : async (s) => {
       await e(E(k.PROXY, s));
     };
-    this.message = new We(async (s) => {
+    this.message = new Qe(async (s) => {
       await e(E(k.MESSAGE, s));
-    }), this._proxyClient = new ze(t), this._proxyServer = new Xe(t, this._proxyOpts), this.proxy = {
+    }), this._proxyClient = new st(t), this._proxyServer = new ht(t, this._proxyOpts), this.proxy = {
       fetch: (s, n) => this._proxyClient.fetch(s, n),
       serve: (s) => {
         s && (s.allowList != null && (this._proxyServer._allowList = s.allowList), s.blockList != null && (this._proxyServer._blockList = s.blockList), s.chunkSize != null && (this._proxyServer._chunkSize = s.chunkSize), s.compress != null && (this._proxyServer._compress = s.compress)), this._proxyServer.serve();
       },
       stop: () => this._proxyServer.stop()
-    }, this.stream = new et(async (s) => {
+    }, this.stream = new dt(async (s) => {
       await e(E(k.STREAM, s));
     });
   }
@@ -1947,7 +2155,7 @@ class st {
         await this.pool.sendOnChannel(s, i);
       });
     }
-    this.bonding ? this.bonding.updatePaths(e, t) : (this.bonding = new ve({
+    this.bonding ? this.bonding.updatePaths(e, t) : (this.bonding = new Fe({
       senders: e,
       linkIds: t,
       monitor: this.monitor
@@ -1981,13 +2189,13 @@ class st {
     }
   }
   _handleChunkData(e, t) {
-    const s = Pe(e);
+    const s = je(e);
     if (s.flags & L.PROBE) {
       this._handleProbe(s, t);
       return;
     }
     if (s.flags & L.META) {
-      const n = Le(s.payload);
+      const n = Ge(s.payload);
       this._pendingMeta.set(s.transferId, n), this._emit("file-incoming", { transferId: s.transferId, ...n });
       return;
     }
@@ -2002,7 +2210,7 @@ class st {
       const s = `dc-${t}`;
       this.monitor.addLink(s);
       const n = setInterval(async () => {
-        const i = De(performance.now());
+        const i = Je(performance.now());
         try {
           await this.pool.sendOnChannel(t, E(k.CHUNK, i)), this.monitor.recordProbeSent(s);
         } catch {
@@ -2013,35 +2221,36 @@ class st {
   }
   _handleProbe(e, t) {
     if (e.payload) {
-      const s = Ne(e.payload), n = performance.now() - s;
+      const s = Ke(e.payload), n = performance.now() - s;
       n > 0 && n < 3e4 && this.monitor.recordProbeResponse(t, n);
     }
   }
 }
 export {
-  ve as BondingEngine,
-  me as ConnectionMonitor,
-  ge as DEFAULT_CHUNK_SIZE,
-  Ce as DataChannelPool,
-  g as DriveSignal,
-  st as FastRTC,
+  Fe as BondingEngine,
+  Te as ConnectionMonitor,
+  Ie as DEFAULT_CHUNK_SIZE,
+  Le as DataChannelPool,
+  pe as DirectSignal,
+  p as DriveSignal,
   L as Flags,
   K as HEADER_SIZE,
-  Ze as MediaManager,
-  We as Messenger,
-  ze as ProxyClient,
+  lt as MediaManager,
+  Qe as Messenger,
+  st as ProxyClient,
   y as ProxyFrameType,
-  Xe as ProxyServer,
-  Ee as SignalManager,
-  _e as Stream,
-  et as StreamManager,
-  Pe as decodeChunk,
-  Le as decodeMetaPayload,
-  Ne as decodeProbeTimestamp,
-  we as decodeProxyFrame,
-  ee as encodeChunk,
-  Oe as encodeMetaChunk,
-  De as encodeProbe,
-  qe as encodeRequest,
-  ce as splitIntoChunks
+  ht as ProxyServer,
+  Re as SignalManager,
+  _t as SpeedRTC,
+  ke as Stream,
+  dt as StreamManager,
+  je as decodeChunk,
+  Ge as decodeMetaPayload,
+  Ke as decodeProbeTimestamp,
+  Ae as decodeProxyFrame,
+  ie as encodeChunk,
+  ze as encodeMetaChunk,
+  Je as encodeProbe,
+  Xe as encodeRequest,
+  me as splitIntoChunks
 };
