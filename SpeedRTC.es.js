@@ -109,8 +109,8 @@ class De {
     });
   }
 }
-const fe = 0.3, We = 2e4, He = 8e3, Be = 5e3, $e = 4, Fe = 1;
-class je {
+const fe = 0.3, We = 2e4, He = 8e3, Be = 5e3, $e = 4, qe = 1;
+class Fe {
   constructor(e) {
     this.url = e, this.ws = null, this.connected = !1, this.latency = 0, this.load = 0, this.score = 1, this._lastSentAt = 0, this._awaitingResponse = !1, this._onMessage = null;
   }
@@ -184,7 +184,7 @@ class je {
 }
 class Ie {
   constructor(e) {
-    this.nodes = e.map((t) => new je(t)), this._active = [], this._primary = null, this._pingTimer = null, this._rebalanceTimer = null, this._closed = !1, this.onMessage = null, this.onRebalance = null, this.onNodeJoined = null;
+    this.nodes = e.map((t) => new Fe(t)), this._active = [], this._primary = null, this._pingTimer = null, this._rebalanceTimer = null, this._closed = !1, this.onMessage = null, this.onRebalance = null, this.onNodeJoined = null;
   }
   get connected() {
     return this._active.some((e) => e.connected);
@@ -196,7 +196,7 @@ class Ie {
     return new Promise((e, t) => {
       let s = 0, n = !1;
       const i = this.nodes.length, r = () => {
-        if (!n && this._active.length >= Fe) {
+        if (!n && this._active.length >= qe) {
           n = !0, this._primary = this._best(), this._startTimers(), e(this._active.length);
           return;
         }
@@ -375,7 +375,7 @@ class re {
   }
 }
 ue(re, "DEFAULT_TRACKER_URLS", pe);
-const Z = "https://oauth2.googleapis.com/token", _e = "https://www.googleapis.com/auth/spreadsheets", qe = "https://accounts.google.com/gsi/client";
+const Z = "https://oauth2.googleapis.com/token", _e = "https://www.googleapis.com/auth/spreadsheets", je = "https://accounts.google.com/gsi/client";
 let ge = !1, X = null;
 const ee = /* @__PURE__ */ new Map();
 function me(l) {
@@ -405,6 +405,9 @@ class g {
         "DriveSignal requires one of: raw ({ token }), clientId (client-only), accessToken, refreshToken (+ clientId/clientSecret), serviceAccount, or apiKey"
       );
     this.peerId = g._generatePeerId(), this.remotePeerId = null, this.onMessage = null, this.onOpen = null, this.onClose = null, this.connected = !1, this._pollTimer = null, this._myColumn = null, this._remoteColIndex = null, this._readCursor = 1, this._destroyed = !1, this._baseUrl = "https://sheets.googleapis.com/v4/spreadsheets";
+  }
+  _qSheet() {
+    return "'" + this.sheetName.replace(/'/g, "''") + "'";
   }
   async warmup() {
     if (this._authMode === "refresh" || this._authMode === "service")
@@ -453,7 +456,7 @@ class g {
   async cleanup() {
     if (this._myColumn)
       try {
-        const e = `${this.sheetName}!${this._myColumn}2:${this._myColumn}1000`;
+        const e = `${this._qSheet()}!${this._myColumn}2:${this._myColumn}1000`;
         await this._sheetsRequest(
           `/${this.spreadsheetId}/values/${encodeURIComponent(e)}:clear`,
           "POST"
@@ -465,7 +468,7 @@ class g {
     let e = [];
     try {
       const n = await this._sheetsRequest(
-        `/${this.spreadsheetId}/values/${encodeURIComponent(`${this.sheetName}!1:1`)}`,
+        `/${this.spreadsheetId}/values/${encodeURIComponent(`${this._qSheet()}!1:1`)}`,
         "GET"
       );
       e = n.values ? n.values[0] : [];
@@ -485,7 +488,7 @@ class g {
       return;
     }
     const s = e.length;
-    this._myColumn = g._colLetter(s), await this._writeCell(`${this.sheetName}!${this._myColumn}1`, this.peerId);
+    this._myColumn = g._colLetter(s), await this._writeCell(`${this._qSheet()}!${this._myColumn}1`, this.peerId);
   }
   async _registerColumn() {
     const e = await this._readHeaders(), t = e.indexOf(this.peerId);
@@ -494,7 +497,7 @@ class g {
       return;
     }
     const s = e.length;
-    this._myColumn = g._colLetter(s), await this._writeCell(`${this.sheetName}!${this._myColumn}1`, this.peerId);
+    this._myColumn = g._colLetter(s), await this._writeCell(`${this._qSheet()}!${this._myColumn}1`, this.peerId);
   }
   _startPolling() {
     this._poll(), this._pollTimer = setInterval(() => this._poll(), this.pollInterval);
@@ -507,7 +510,7 @@ class g {
       try {
         let e;
         if (this._authMode === "raw" ? e = await this._rawReadSheet() : e = (await this._sheetsRequest(
-          `/${this.spreadsheetId}/values/${encodeURIComponent(this.sheetName)}`,
+          `/${this.spreadsheetId}/values/${encodeURIComponent(this._qSheet())}`,
           "GET"
         )).values, !e || e.length === 0) return;
         const t = e[0];
@@ -616,7 +619,7 @@ class g {
   static _loadGisScript() {
     return ge && typeof google < "u" && google.accounts ? Promise.resolve() : X || (X = new Promise((e, t) => {
       const s = document.createElement("script");
-      s.src = qe, s.async = !0, s.onload = () => {
+      s.src = je, s.async = !0, s.onload = () => {
         ge = !0, e();
       }, s.onerror = () => t(new Error("[DriveSignal] Failed to load Google Identity Services script")), document.head.appendChild(s);
     }), X);
@@ -624,7 +627,7 @@ class g {
   async _readHeaders() {
     if (this._authMode === "raw")
       return this._lastRawValues = await this._rawReadSheet(), this._lastRawValues.length > 0 ? this._lastRawValues[0] : [];
-    const e = `${this.sheetName}!1:1`;
+    const e = `${this._qSheet()}!1:1`;
     try {
       const t = await this._sheetsRequest(
         `/${this.spreadsheetId}/values/${encodeURIComponent(e)}`,
@@ -653,7 +656,7 @@ class g {
     }
     const s = this._myWriteRow;
     this._myWriteRow++;
-    const n = `${this.sheetName}!${e}${s}`;
+    const n = `${this._qSheet()}!${e}${s}`;
     await this._sheetsRequest(
       `/${this.spreadsheetId}/values/${encodeURIComponent(n)}?valueInputOption=RAW`,
       "PUT",
@@ -1153,7 +1156,7 @@ const S = {
   BODY: 3,
   END: 4,
   ERROR: 5
-}, J = new TextEncoder(), q = new TextDecoder();
+}, J = new TextEncoder(), j = new TextDecoder();
 function et(l, e, t, s = {}, n = null) {
   const i = J.encode(e), r = J.encode(t), c = J.encode(JSON.stringify(s)), a = n ? new Uint8Array(n) : new Uint8Array(0), o = 6 + i.length + 2 + r.length + 4 + c.length + a.length, h = new ArrayBuffer(o), d = new DataView(h), u = new Uint8Array(h);
   let f = 0;
@@ -1183,15 +1186,15 @@ function Ae(l) {
       let i = 5;
       const r = e.getUint8(i);
       i += 1;
-      const c = q.decode(t.slice(i, i + r));
+      const c = j.decode(t.slice(i, i + r));
       i += r;
       const a = e.getUint16(i, !0);
       i += 2;
-      const o = q.decode(t.slice(i, i + a));
+      const o = j.decode(t.slice(i, i + a));
       i += a;
       const h = e.getUint32(i, !0);
       i += 4;
-      const d = JSON.parse(q.decode(t.slice(i, i + h)));
+      const d = JSON.parse(j.decode(t.slice(i, i + h)));
       i += h;
       const u = i < l.byteLength ? l.slice(i) : null;
       return { type: s, requestId: n, method: c, url: o, headers: d, body: u };
@@ -1202,7 +1205,7 @@ function Ae(l) {
       i += 2;
       const c = e.getUint32(i, !0);
       i += 4;
-      const a = JSON.parse(q.decode(t.slice(i, i + c)));
+      const a = JSON.parse(j.decode(t.slice(i, i + c)));
       return { type: s, requestId: n, status: r, headers: a };
     }
     case S.BODY: {
@@ -1212,7 +1215,7 @@ function Ae(l) {
     case S.END:
       return { type: s, requestId: n, seqCount: l.byteLength >= 9 ? e.getUint32(5, !0) : 0 };
     case S.ERROR:
-      return { type: s, requestId: n, message: q.decode(t.slice(5)) };
+      return { type: s, requestId: n, message: j.decode(t.slice(5)) };
     default:
       return { type: s, requestId: n };
   }
@@ -1665,24 +1668,24 @@ class dt {
       const ce = m.headers.get("etag"), he = m.headers.get("last-modified"), le = m.headers.get("cache-control") || "", Oe = le.includes("no-store") || le.includes("no-cache");
       if (D && !Oe && at.has(m.status) && (ce || he) && (G.size >= ot && G.delete(G.keys().next().value), G.set(D, { etag: ce, lastModified: he })), P["x-speedrtc-status-text"] = m.statusText, P["x-speedrtc-url"] = m.url, m.redirected && (P["x-speedrtc-redirected"] = "1"), this._compress && (P["x-speedrtc-compressed"] = "gzip"), await this._send(Ce(s, m.status, P)), m.body) {
         const w = (m.headers.get("content-type") || "").toLowerCase(), E = w.includes("text/css"), $ = w.includes("text/html"), de = m.url || i;
-        let F = m.body;
+        let q = m.body;
         if (E) {
-          const W = await new Response(F).arrayBuffer(), O = this._rewriteCssUrls(new TextDecoder().decode(W), de), A = new TextEncoder().encode(O), I = this._chunkSize;
+          const W = await new Response(q).arrayBuffer(), O = this._rewriteCssUrls(new TextDecoder().decode(W), de), A = new TextEncoder().encode(O), I = this._chunkSize;
           let k = 0;
           if (this._compress && typeof CompressionStream < "u") {
             const y = new CompressionStream("gzip"), N = y.writable.getWriter();
             N.write(A), N.close();
-            const j = y.readable.getReader();
+            const F = y.readable.getReader();
             try {
               for (; ; ) {
-                const { done: Q, value: v } = await j.read();
+                const { done: Q, value: v } = await F.read();
                 if (Q) break;
                 if (v != null && v.length)
                   for (let U = 0; U < v.length; U += I)
                     await this._send(z(s, k++, v.subarray(U, U + I)));
               }
             } finally {
-              j.cancel().catch(() => {
+              F.cancel().catch(() => {
               });
             }
           } else
@@ -1690,7 +1693,7 @@ class dt {
               await this._send(z(s, k++, A.subarray(y, y + I)));
           a = k;
         } else if ($) {
-          const W = await new Response(F).arrayBuffer();
+          const W = await new Response(q).arrayBuffer();
           let O = new TextDecoder().decode(W);
           O = this._rewriteHtml(O, de);
           const A = new TextEncoder().encode(O), I = this._chunkSize;
@@ -1698,17 +1701,17 @@ class dt {
           if (this._compress && typeof CompressionStream < "u") {
             const y = new CompressionStream("gzip"), N = y.writable.getWriter();
             N.write(A), N.close();
-            const j = y.readable.getReader();
+            const F = y.readable.getReader();
             try {
               for (; ; ) {
-                const { done: Q, value: v } = await j.read();
+                const { done: Q, value: v } = await F.read();
                 if (Q) break;
                 if (v != null && v.length)
                   for (let U = 0; U < v.length; U += I)
                     await this._send(z(s, k++, v.subarray(U, U + I)));
               }
             } finally {
-              j.cancel().catch(() => {
+              F.cancel().catch(() => {
               });
             }
           } else
@@ -1716,8 +1719,8 @@ class dt {
               await this._send(z(s, k++, A.subarray(y, y + I)));
           a = k;
         } else {
-          this._compress && typeof CompressionStream < "u" && (F = F.pipeThrough(new CompressionStream("gzip")));
-          const W = F.getReader();
+          this._compress && typeof CompressionStream < "u" && (q = q.pipeThrough(new CompressionStream("gzip")));
+          const W = q.getReader();
           let O = 0;
           const A = this._chunkSize;
           try {
